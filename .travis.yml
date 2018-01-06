@@ -4,3 +4,8 @@ rust:
   - beta
   - nightly
 cache: cargo
+
+addons:
+  apt:
+    packages:
+      - xorg-dev
