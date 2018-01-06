@@ -20,6 +20,14 @@ And this to your crate root:
 extern crate blit;
 ```
 
+### Run the example
+
+    cargo run --example smiley
+
+This should produce the following window:
+
+![Example](img/example.png?raw=true)
+
 ## Examples
 
 ```rust
