@@ -1,0 +1,27 @@
+[package]
+name = "blit"
+version = "0.1.0"
+authors = ["Thomas Versteeg <thomasversteeg@gmx.com>"]
+license = "GPL-3.0"
+homepage = "https://github.com/tversteeg/blit"
+
+readme = "README.md"
+description = "Blit sprites on a buffer with a mask"
+documentation = "https://docs.rs/blit"
+
+repository = "https://github.com/tversteeg/blit.git"
+keywords = ["image", "gamedev", "sprite", "blitting"]
+categories = ["games", "rendering", "game-engines", "multimedia"]
+
+[badges]
+travis-ci = {repository = "tversteeg/blit"}
+
+[dependencies]
+image = "0.18"
+
+[[example]]
+name = "smiley"
+path = "examples/smiley.rs"
+
+[dev-dependencies]
+minifb = "0.10"
