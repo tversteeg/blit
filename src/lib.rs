@@ -1,5 +1,3 @@
-extern crate image;
-
 //! Draw sprites quickly using bitwise operations and a masking color.
 //!
 //! # Usage
@@ -36,8 +34,8 @@ extern crate image;
 //! let pos = (0, 0);
 //! img_rgb.blit_with_mask_color(&mut buffer, (WIDTH, HEIGHT), pos, MASK_COLOR);
 //!
-//! // Blit by creating a special blitting buffer first, this has some initial overhead but is a
-//! lot faster after multiple calls
+//! // Blit by creating a special blitting buffer first, this has some initial
+//! // overhead but is a lot faster after multiple calls
 //! let blit_buffer = img_rgb.as_blit_buffer(MASK_COLOR);
 //!
 //! let pos = (10, 10);
@@ -45,6 +43,8 @@ extern crate image;
 //! let pos = (20, 20);
 //! blit_buffer.blit(&mut buffer, (WIDTH, HEIGHT), pos);
 //! ```
+//!
+extern crate image;
 
 use image::*;
 use std::cmp;
