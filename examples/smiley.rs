@@ -28,7 +28,7 @@ fn main() {
     let rgb = img.as_rgb8().unwrap();
     rgb.blit_with_mask_color(&mut buffer, (WIDTH, HEIGHT), (0, 0), 0xFFFFFF);
 
-    let blit_buf = rgb.to_buffer(MASK_COLOR);
+    let blit_buf = rgb.as_blit_buffer(MASK_COLOR);
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         window.get_mouse_pos(MouseMode::Discard).map(|mouse| {

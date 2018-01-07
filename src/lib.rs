@@ -1,8 +1,55 @@
 extern crate image;
 
+//! Draw sprites quickly using bitwise operations and a masking color.
+//!
+//! # Usage
+//!
+//! This crate is [on crates.io](htpps://crates.io/crates/blit) and can be used by adding
+//! `blit` to the dependencies in your project's `Cargo.toml`.
+//!
+//! ```toml
+//! [dependencies]
+//! blit = "0.1"
+//! ```
+//!
+//! and this to your crate root:
+//!
+//! ```rust
+//! extern crate blit;
+//! ```
+//!
+//! # Examples
+//!
+//! ```rust
+//! use blit::*;
+//!
+//! const WIDTH: usize = 180;
+//! const HEIGHT: usize = 180;
+//! const MASK_COLOR: u32 = 0xFFFF00FF;
+//!
+//! let mut buffer: Vec<u32> = vec![0xFFFFFFFF; WIDTH * HEIGHT];
+//!
+//! let img = image::open("examples/smiley.png").unwrap();
+//! let img_rgb = img.as_rgb8().unwrap();
+//!
+//! // Blit directly to the buffer
+//! let pos = (0, 0);
+//! img_rgb.blit_with_mask_color(&mut buffer, (WIDTH, HEIGHT), pos, MASK_COLOR);
+//!
+//! // Blit by creating a special blitting buffer first, this has some initial overhead but is a
+//! lot faster after multiple calls
+//! let blit_buffer = img_rgb.as_blit_buffer(MASK_COLOR);
+//!
+//! let pos = (10, 10);
+//! blit_buffer.blit(&mut buffer, (WIDTH, HEIGHT), pos);
+//! let pos = (20, 20);
+//! blit_buffer.blit(&mut buffer, (WIDTH, HEIGHT), pos);
+//! ```
+
 use image::*;
 use std::cmp;
 
+/// A data structure holding a color and a mask buffer to make blitting on a buffer real fast.
 pub struct BlitBuffer {
     width: usize,
     height: usize,
@@ -52,14 +99,14 @@ impl BlitBuffer {
 pub trait BlitExt {
     /// Convert the image to a custom `BlitBuffer` type which is optimized for applying the
     /// blitting operations.
-    fn to_buffer(&self, mask_color: u32) -> BlitBuffer;
+    fn as_blit_buffer(&self, mask_color: u32) -> BlitBuffer;
 
     /// Blit the image directly on a buffer.
     fn blit_with_mask_color(&self, buffer: &mut Vec<u32>, buffer_size: (usize, usize), pos: (i32, i32), mask_color: u32);
 }
 
 impl BlitExt for RgbImage {
-    fn to_buffer(&self, mask_color: u32) -> BlitBuffer {
+    fn as_blit_buffer(&self, mask_color: u32) -> BlitBuffer {
         let (width, height) = self.dimensions();
 
         let pixels = (width * height) as usize;
