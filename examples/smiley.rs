@@ -3,11 +3,13 @@ extern crate image;
 extern crate minifb;
 
 use blit::*;
-use image::GenericImage;
 use minifb::*;
+use image::GenericImage;
 
 const WIDTH: usize = 180;
 const HEIGHT: usize = 180;
+
+const MASK_COLOR: u32 = 0xFFFF00FF;
 
 fn main() {
     let mut buffer: Vec<u32> = vec![0x00FFFFFF; WIDTH * HEIGHT];
@@ -26,12 +28,14 @@ fn main() {
     let rgb = img.as_rgb8().unwrap();
     rgb.blit_with_mask_color(&mut buffer, (WIDTH, HEIGHT), (0, 0), 0xFFFFFF);
 
+    let blit_buf = rgb.to_buffer(MASK_COLOR);
+
     while window.is_open() && !window.is_key_down(Key::Escape) {
         window.get_mouse_pos(MouseMode::Discard).map(|mouse| {
             if window.get_mouse_down(MouseButton::Left) {
                 let x_pos = mouse.0 as i32 - (img_size.0 / 2) as i32;
                 let y_pos = mouse.1 as i32 - (img_size.1 / 2) as i32;
-                rgb.blit_with_mask_color(&mut buffer, (WIDTH, HEIGHT), (x_pos, y_pos), 0x00FF00FF);
+                blit_buf.blit(&mut buffer, (WIDTH, HEIGHT), (x_pos, y_pos));
             }
         });
 
