@@ -1,3 +1,5 @@
+#![crate_name = "blit"]
+
 //! Draw sprites quickly using bitwise operations and a masking color.
 //!
 //! # Usage
@@ -7,7 +9,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! blit = "0.1"
+//! blit = "0.2"
 //! ```
 //!
 //! and this to your crate root:
@@ -18,8 +20,8 @@
 //!
 //! # Examples
 //!
-//! ```rust
-//! use blit::*;
+//! ```ignore
+//! extern crate image;
 //!
 //! const WIDTH: usize = 180;
 //! const HEIGHT: usize = 180;
@@ -43,7 +45,7 @@
 //! let pos = (20, 20);
 //! blit_buffer.blit(&mut buffer, (WIDTH, HEIGHT), pos);
 //! ```
-//!
+
 extern crate image;
 
 use image::*;
