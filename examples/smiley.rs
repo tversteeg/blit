@@ -30,6 +30,10 @@ fn main() {
 
     let blit_buf = rgb.as_blit_buffer(MASK_COLOR);
 
+    // Save the buffer to disk and load it again
+    blit_buf.save("smiley.blit").unwrap();
+    let blit_buf = BlitBuffer::open("smiley.blit").unwrap();
+
     while window.is_open() && !window.is_key_down(Key::Escape) {
         window.get_mouse_pos(MouseMode::Discard).map(|mouse| {
             if window.get_mouse_down(MouseButton::Left) {

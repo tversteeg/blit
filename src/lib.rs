@@ -44,14 +44,26 @@
 //! blit_buffer.blit(&mut buffer, (WIDTH, HEIGHT), pos);
 //! let pos = (20, 20);
 //! blit_buffer.blit(&mut buffer, (WIDTH, HEIGHT), pos);
+//!
+//! // Save the blit buffer to a file
+//! blit_buffer.save("smiley.blit");
 //! ```
 
 extern crate image;
+extern crate bincode;
+#[macro_use]
+extern crate serde_derive;
 
-use image::*;
 use std::cmp;
+use std::io::{BufWriter, Read};
+use std::fs::File;
+use std::path::Path;
+use std::error::Error;
+use image::*;
+use bincode::{serialize, deserialize, Infinite};
 
 /// A data structure holding a color and a mask buffer to make blitting on a buffer real fast.
+#[derive(Serialize, Deserialize)]
 pub struct BlitBuffer {
     width: usize,
     height: usize,
@@ -94,6 +106,38 @@ impl BlitBuffer {
                 buffer[buffer_index] = pixel;
             }
         }
+    }
+
+    /// Saves the buffer to a file at the path specified.
+    /// A custom binary format is used for this.
+    pub fn save<P>(&self, path: P) -> Result<(), Box<Error>> where P: AsRef<Path> {
+        let mut file = File::create(path)?;
+        {
+            let mut writer = BufWriter::new(&mut file);
+            bincode::serialize_into(&mut writer, &self, Infinite)?;
+        }
+        file.sync_all();
+
+        Ok(())
+    }
+
+    /// Create a new buffer from a file at the path specified.
+    /// The file needs to be the custom binary format.
+    pub fn open<P>(path: P) -> Result<Self, Box<Error>> where P: AsRef<Path> {
+        let mut file = File::open(path)?;
+
+        let mut data = Vec::new();
+        file.read_to_end(&mut data)?;
+
+        BlitBuffer::load_from_memory(&data[..])
+    }
+
+    /// Create a new buffer from a file at the path specified.
+    /// The array needs to be the custom binary format.
+    pub fn load_from_memory(buffer: &[u8]) -> Result<Self, Box<Error>> {
+        let buffer = deserialize(buffer)?;
+
+        Ok(buffer)
     }
 }
 

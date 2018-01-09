@@ -1,6 +1,6 @@
 [package]
 name = "blit"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Thomas Versteeg <thomasversteeg@gmx.com>"]
 license = "GPL-3.0"
 homepage = "https://github.com/tversteeg/blit"
@@ -18,6 +18,9 @@ travis-ci = {repository = "tversteeg/blit"}
 
 [dependencies]
 image = "0.18"
+bincode = "0.9"
+serde = "1.0"
+serde_derive = "1.0"
 
 [[example]]
 name = "smiley"
