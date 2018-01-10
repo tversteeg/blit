@@ -139,6 +139,11 @@ impl BlitBuffer {
 
         Ok(buffer)
     }
+
+    /// Get the size of the buffer in pixels.
+    pub fn size(&self) -> (usize, usize) {
+        (self.width, self.height)
+    }
 }
 
 /// A trait adding blitting functions to image types.
