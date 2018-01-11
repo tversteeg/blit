@@ -60,7 +60,7 @@ use std::fs::File;
 use std::path::Path;
 use std::error::Error;
 use image::*;
-use bincode::{serialize, deserialize, Infinite};
+use bincode::{serialize_into, deserialize, Infinite};
 
 /// A data structure holding a color and a mask buffer to make blitting on a buffer real fast.
 #[derive(Serialize, Deserialize)]
@@ -76,6 +76,16 @@ impl BlitBuffer {
     /// Blit the image on a buffer using bitwise operations--this is a lot faster than
     /// `blit_with_mask_color`.
     pub fn blit(&self, buffer: &mut Vec<u32>, buffer_size: (usize, usize), pos: (i32, i32)) {
+        if pos == (0, 0) && buffer_size.0 == self.width && buffer_size.1 == self.height {
+            // If the sizes match and the buffers are aligned we don't have to do any special
+            // bounds checks
+            for (pixel, (color, mask)) in buffer.iter_mut().zip(self.color.iter().zip(&self.mask)) {
+                *pixel = *pixel & *mask | *color;
+            }
+
+            return;
+        }
+
         // Make sure only the pixels get rendered that are inside the buffer
         let min_x = cmp::max(-pos.0, 0);
         let min_y = cmp::max(-pos.1, 0);
@@ -83,28 +93,26 @@ impl BlitBuffer {
         let max_x = cmp::min(buffer_size.0 as i32 - pos.0, self.width as i32);
         let max_y = cmp::min(buffer_size.1 as i32 - pos.1, self.height as i32);
 
+        let mut y_index = min_y as usize;
         for y in min_y..max_y {
-            let y_index = y as usize * self.width;
-
             // Apply the offsets
-            let buffer_y = (y + pos.1) as usize;
+            let buffer_y = (y + pos.1) as usize * buffer_size.0;
             for x in min_x..max_x {
                 // Apply the offsets
                 let buffer_x = (x + pos.0) as usize;
 
                 // Calculate the index of the buffer
-                let buffer_index = buffer_x + buffer_y * buffer_size.0;
-                let mut pixel = buffer[buffer_index];
+                let pixel = &mut buffer[buffer_x + buffer_y];
 
                 // Calculate the index of the source image
                 let index = x as usize + y_index;
 
                 // First draw the mask as black on the background using an AND operation, and then
                 // draw the colors using an OR operation
-                pixel = pixel & self.mask[index] | self.color[index];
-
-                buffer[buffer_index] = pixel;
+                *pixel = *pixel & self.mask[index] | self.color[index];
             }
+
+            y_index += self.width;
         }
     }
 
@@ -114,9 +122,9 @@ impl BlitBuffer {
         let mut file = File::create(path)?;
         {
             let mut writer = BufWriter::new(&mut file);
-            bincode::serialize_into(&mut writer, &self, Infinite)?;
+            serialize_into(&mut writer, &self, Infinite)?;
         }
-        file.sync_all();
+        file.sync_all()?;
 
         Ok(())
     }
