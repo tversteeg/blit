@@ -26,7 +26,7 @@ fn main() {
     let img_size = img.dimensions();
 
     let rgb = img.as_rgb8().unwrap();
-    rgb.blit_with_mask_color(&mut buffer, (WIDTH, HEIGHT), (0, 0), 0xFFFFFF);
+    rgb.blit_with_mask_color(&mut buffer, (WIDTH as i32, HEIGHT as i32), (0, 0), 0xFFFFFF);
 
     let blit_buf = rgb.as_blit_buffer(MASK_COLOR);
 
@@ -39,17 +39,15 @@ fn main() {
 
     // Draw the left half
     blit_buf.blit_rect(&mut buffer,
-                       (WIDTH, HEIGHT),
-                       (0, blit_size.1 as i32),
-                       (half_size.0, blit_size.1),
-                       (0, 0));
+                       (WIDTH as i32, HEIGHT as i32),
+                       (0, blit_size.1),
+                       (0, 0, half_size.0, blit_size.1));
 
-    // Draw the top right quart
+    // Draw the bottom right part
     blit_buf.blit_rect(&mut buffer,
-                       (WIDTH, HEIGHT),
-                       (half_size.0 as i32, blit_size.1 as i32),
-                       (half_size.0, half_size.1),
-                       (half_size.0 as i32, 0));
+                       (WIDTH as i32, HEIGHT as i32),
+                       (half_size.0, (blit_size.1 + half_size.1)),
+                       (half_size.0, half_size.1, half_size.0, half_size.1));
 
     let mut draw_countdown = 0;
     while window.is_open() && !window.is_key_down(Key::Escape) {
@@ -57,7 +55,7 @@ fn main() {
             if draw_countdown <= 0 && window.get_mouse_down(MouseButton::Left) {
                 let x_pos = mouse.0 as i32 - (img_size.0 / 2) as i32;
                 let y_pos = mouse.1 as i32 - (img_size.1 / 2) as i32;
-                blit_buf.blit(&mut buffer, (WIDTH, HEIGHT), (x_pos, y_pos));
+                blit_buf.blit(&mut buffer, (WIDTH as i32, HEIGHT as i32), (x_pos, y_pos));
 
                 draw_countdown = 10;
             }

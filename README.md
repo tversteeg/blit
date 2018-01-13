@@ -11,7 +11,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-blit = "0.2"
+blit = "0.3"
 ```
 
 And this to your crate root:
@@ -21,6 +21,8 @@ extern crate blit;
 ```
 
 ### Run the example
+
+On Linux you need the `xorg-dev` package as required by `minifb`. `sudo apt install xorg-dev`
 
     cargo run --example smiley
 

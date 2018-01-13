@@ -9,7 +9,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! blit = "0.2"
+//! blit = "0.3"
 //! ```
 //!
 //! and this to your crate root:
@@ -65,8 +65,8 @@ use bincode::{serialize_into, deserialize, Infinite};
 /// A data structure holding a color and a mask buffer to make blitting on a buffer real fast.
 #[derive(Serialize, Deserialize)]
 pub struct BlitBuffer {
-    width: usize,
-    height: usize,
+    width: i32,
+    height: i32,
 
     color: Vec<u32>,
     mask: Vec<u32>
@@ -75,75 +75,69 @@ pub struct BlitBuffer {
 impl BlitBuffer {
     /// Blit the image on a buffer using bitwise operations--this is a lot faster than
     /// `blit_with_mask_color`.
-    pub fn blit(&self, buffer: &mut Vec<u32>, buffer_size: (usize, usize), pos: (i32, i32)) {
-        if pos == (0, 0) && buffer_size.0 == self.width && buffer_size.1 == self.height {
+    pub fn blit(&self, dst: &mut Vec<u32>, dst_size: (i32, i32), offset: (i32, i32)) {
+        if offset == (0, 0) && dst_size.0 == self.width && dst_size.1 == self.height {
             // If the sizes match and the buffers are aligned we don't have to do any special
             // bounds checks
-            for (pixel, (color, mask)) in buffer.iter_mut().zip(self.color.iter().zip(&self.mask)) {
+            for (pixel, (color, mask)) in dst.iter_mut().zip(self.color.iter().zip(&self.mask)) {
                 *pixel = *pixel & *mask | *color;
             }
 
             return;
         }
 
-        let min_x = cmp::max(-pos.0, 0);
-        let min_y = cmp::max(-pos.1, 0);
+        let src_size = (self.width, self.height);
 
-        let max_x = cmp::min(buffer_size.0 as i32 - pos.0, self.width as i32);
-        let max_y = cmp::min(buffer_size.1 as i32 - pos.1, self.height as i32);
+        let dst_start = (cmp::max(offset.0, 0),
+                         cmp::max(offset.1, 0));
+        let dst_end = (cmp::min(offset.0 + src_size.0, dst_size.0),
+                       cmp::min(offset.1 + src_size.1, dst_size.1));
 
-        let mut y_index = min_y as usize;
-        for y in min_y..max_y {
-            // Apply the offsets
-            let buffer_y = (y + pos.1) as usize * buffer_size.0;
-            for x in min_x..max_x {
-                // Apply the offsets
-                let buffer_x = (x + pos.0) as usize;
+        for dst_y in dst_start.1..dst_end.1 {
+            let src_y = dst_y - offset.1;
+            
+            let dst_y_index = dst_y * dst_size.0;
+            let src_y_index = src_y * src_size.0;
 
-                // Calculate the index of the buffer
-                let pixel = &mut buffer[buffer_x + buffer_y];
+            for dst_x in dst_start.0..dst_end.0 {
+                let src_x = dst_x - offset.0;
 
-                // Calculate the index of the source image
-                let index = x as usize + y_index;
+                let src_index = (src_x + src_y_index) as usize;
+                let dst_index = (dst_x + dst_y_index) as usize;
 
-                // First draw the mask as black on the background using an AND operation, and then
-                // draw the colors using an OR operation
-                *pixel = *pixel & self.mask[index] | self.color[index];
+                let dst_pixel = &mut dst[dst_index];
+                *dst_pixel = *dst_pixel & self.mask[src_index] | self.color[src_index];
             }
-
-            y_index += self.width;
         }
     }
 
     /// Blit a section of the image on a buffer.
-    pub fn blit_rect(&self, buffer: &mut Vec<u32>, buffer_size: (usize, usize), pos: (i32, i32), rect_size: (usize, usize), rect_pos: (i32, i32)) {
-        // Make sure only the pixels get rendered that are inside the buffer
-        let min_x = cmp::max(-pos.0, -rect_pos.0);
-        let min_y = cmp::max(-pos.1, -rect_pos.1);
+    pub fn blit_rect(&self, dst: &mut Vec<u32>, dst_size: (i32, i32), offset: (i32, i32), sub_rect: (i32, i32, i32, i32)) {
+        let src_size = (self.width, self.height);
 
-        let max_x = cmp::min(buffer_size.0 as i32 - pos.0, rect_size.0 as i32);
-        let max_y = cmp::min(buffer_size.1 as i32 - pos.1, rect_size.1 as i32);
+        let dst_start = (cmp::max(offset.0, 0),
+                         cmp::max(offset.1, 0));
+        let dst_end = (cmp::min(offset.0 + sub_rect.2, dst_size.0),
+                       cmp::min(offset.1 + sub_rect.3, dst_size.1));
 
-        let mut y_index = (min_y + rect_pos.1) as usize;
-        for y in min_y..max_y {
-            // Apply the offsets
-            let buffer_y = (y + pos.1) as usize * buffer_size.0;
-            for x in min_x..max_x {
-                // Apply the offsets
-                let buffer_x = (x + pos.0) as usize;
+        for dst_y in dst_start.1..dst_end.1 {
+            let src_y = dst_y - offset.1 + sub_rect.1;
+            
+            let dst_y_index = dst_y * dst_size.0;
+            let src_y_index = src_y * src_size.0;
 
-                // Calculate the index of the buffer
-                let pixel = &mut buffer[buffer_x + buffer_y];
+            for dst_x in dst_start.0..dst_end.0 {
+                let src_x = dst_x - offset.0 + sub_rect.0;
 
-                // Calculate the index of the source image
-                let index = (x + rect_pos.0) as usize + y_index;
+                let src_index = (src_x + src_y_index) as usize;
+                let dst_index = (dst_x + dst_y_index) as usize;
+
+                let dst_pixel = &mut dst[dst_index];
 
                 // First draw the mask as black on the background using an AND operation, and then
                 // draw the colors using an OR operation
-                *pixel = *pixel & self.mask[index] | self.color[index];
+                *dst_pixel = *dst_pixel & self.mask[src_index] | self.color[src_index];
             }
-
-            y_index += self.width;
         }
     }
 
@@ -180,7 +174,7 @@ impl BlitBuffer {
     }
 
     /// Get the size of the buffer in pixels.
-    pub fn size(&self) -> (usize, usize) {
+    pub fn size(&self) -> (i32, i32) {
         (self.width, self.height)
     }
 }
@@ -192,7 +186,7 @@ pub trait BlitExt {
     fn as_blit_buffer(&self, mask_color: u32) -> BlitBuffer;
 
     /// Blit the image directly on a buffer.
-    fn blit_with_mask_color(&self, buffer: &mut Vec<u32>, buffer_size: (usize, usize), pos: (i32, i32), mask_color: u32);
+    fn blit_with_mask_color(&self, dst: &mut Vec<u32>, dst_size: (i32, i32), offset: (i32, i32), mask_color: u32);
 }
 
 impl BlitExt for RgbImage {
@@ -224,26 +218,25 @@ impl BlitExt for RgbImage {
             }
         }
 
-        BlitBuffer {
-            width: width as usize,
-            height: height as usize,
+        BlitBuffer { 
+            width: width as i32,
+            height: height as i32,
             color,
-            mask
-        }
+            mask }
     }
 
-    fn blit_with_mask_color(&self, buffer: &mut Vec<u32>, buffer_size: (usize, usize), pos: (i32, i32), mask_color: u32) {
+    fn blit_with_mask_color(&self, dst: &mut Vec<u32>, dst_size: (i32, i32), offset: (i32, i32), mask_color: u32) {
         let (width, height) = self.dimensions();
 
         // Add 0xFF to the beginning of the mask so we can use that in the equality check
         let mask_correct = mask_color | 0xFF000000;
 
-        // Make sure only the pixels get rendered that are inside the buffer
-        let min_x = cmp::max(-pos.0, 0);
-        let min_y = cmp::max(-pos.1, 0);
+        // Make sure only the pixels get rendered that are inside the dst
+        let min_x = cmp::max(-offset.0, 0);
+        let min_y = cmp::max(-offset.1, 0);
 
-        let max_x = cmp::min(buffer_size.0 as i32 - pos.0, width as i32);
-        let max_y = cmp::min(buffer_size.1 as i32 - pos.1, height as i32);
+        let max_x = cmp::min(dst_size.0 - offset.0, width as i32);
+        let max_y = cmp::min(dst_size.1 - offset.1, height as i32);
 
         for y in min_y..max_y {
             for x in min_x..max_x {
@@ -255,12 +248,12 @@ impl BlitExt for RgbImage {
                 // Check if the pixel isn't the mask
                 if raw != mask_correct {
                     // Apply the offsets
-                    let buffer_x = (x + pos.0) as usize;
-                    let buffer_y = (y + pos.1) as usize;
+                    let dst_x = (x + offset.0) as usize;
+                    let dst_y = (y + offset.1) as usize;
 
                     // Calculate the index
-                    let index = buffer_x + buffer_y * buffer_size.0;
-                    buffer[index] = raw;
+                    let index = dst_x + dst_y * dst_size.0 as usize;
+                    dst[index] = raw;
                 }
             }
         }
