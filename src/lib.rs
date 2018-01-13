@@ -86,14 +86,19 @@ impl BlitBuffer {
             return;
         }
 
+        self.blit_rect(buffer, buffer_size, pos, (self.width, self.height), (0, 0));
+    }
+
+    /// Blit a section of the image on a buffer.
+    pub fn blit_rect(&self, buffer: &mut Vec<u32>, buffer_size: (usize, usize), pos: (i32, i32), rect_size: (usize, usize), rect_pos: (i32, i32)) {
         // Make sure only the pixels get rendered that are inside the buffer
-        let min_x = cmp::max(-pos.0, 0);
-        let min_y = cmp::max(-pos.1, 0);
+        let min_x = cmp::max(-pos.0, -rect_pos.0);
+        let min_y = cmp::max(-pos.1, -rect_pos.1);
 
-        let max_x = cmp::min(buffer_size.0 as i32 - pos.0, self.width as i32);
-        let max_y = cmp::min(buffer_size.1 as i32 - pos.1, self.height as i32);
+        let max_x = cmp::min(buffer_size.0 as i32 - pos.0, rect_size.0 as i32);
+        let max_y = cmp::min(buffer_size.1 as i32 - pos.1, rect_size.1 as i32);
 
-        let mut y_index = min_y as usize;
+        let mut y_index = (min_y + rect_pos.1) as usize;
         for y in min_y..max_y {
             // Apply the offsets
             let buffer_y = (y + pos.1) as usize * buffer_size.0;
@@ -105,7 +110,7 @@ impl BlitBuffer {
                 let pixel = &mut buffer[buffer_x + buffer_y];
 
                 // Calculate the index of the source image
-                let index = x as usize + y_index;
+                let index = (x + rect_pos.0) as usize + y_index;
 
                 // First draw the mask as black on the background using an AND operation, and then
                 // draw the colors using an OR operation

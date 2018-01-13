@@ -6,8 +6,8 @@ use blit::*;
 use minifb::*;
 use image::GenericImage;
 
-const WIDTH: usize = 180;
-const HEIGHT: usize = 180;
+const WIDTH: usize = 250;
+const HEIGHT: usize = 250;
 
 const MASK_COLOR: u32 = 0xFFFF00FF;
 
@@ -34,14 +34,36 @@ fn main() {
     blit_buf.save("smiley.blit").unwrap();
     let blit_buf = BlitBuffer::open("smiley.blit").unwrap();
 
+    let blit_size = blit_buf.size();
+    let half_size = (blit_size.0 / 2, blit_size.1 / 2);
+
+    // Draw the left half
+    blit_buf.blit_rect(&mut buffer,
+                       (WIDTH, HEIGHT),
+                       (0, blit_size.1 as i32),
+                       (half_size.0, blit_size.1),
+                       (0, 0));
+
+    // Draw the top right quart
+    blit_buf.blit_rect(&mut buffer,
+                       (WIDTH, HEIGHT),
+                       (half_size.0 as i32, blit_size.1 as i32),
+                       (half_size.0, half_size.1),
+                       (half_size.0 as i32, 0));
+
+    let mut draw_countdown = 0;
     while window.is_open() && !window.is_key_down(Key::Escape) {
         window.get_mouse_pos(MouseMode::Discard).map(|mouse| {
-            if window.get_mouse_down(MouseButton::Left) {
+            if draw_countdown <= 0 && window.get_mouse_down(MouseButton::Left) {
                 let x_pos = mouse.0 as i32 - (img_size.0 / 2) as i32;
                 let y_pos = mouse.1 as i32 - (img_size.1 / 2) as i32;
                 blit_buf.blit(&mut buffer, (WIDTH, HEIGHT), (x_pos, y_pos));
+
+                draw_countdown = 10;
             }
         });
+
+        draw_countdown -= 1;
 
         window.update_with_buffer(&buffer).unwrap();
     }
