@@ -23,11 +23,11 @@
 //! ```ignore
 //! extern crate image;
 //!
-//! const WIDTH: usize = 180;
-//! const HEIGHT: usize = 180;
+//! const WIDTH: i32 = 180;
+//! const HEIGHT: i32 = 180;
 //! const MASK_COLOR: u32 = 0xFFFF00FF;
 //!
-//! let mut buffer: Vec<u32> = vec![0xFFFFFFFF; WIDTH * HEIGHT];
+//! let mut buffer: Vec<u32> = vec![0xFFFFFFFF; (WIDTH * HEIGHT) as usize];
 //!
 //! let img = image::open("examples/smiley.png").unwrap();
 //! let img_rgb = img.as_rgb8().unwrap();
@@ -141,6 +141,40 @@ impl BlitBuffer {
         }
     }
 
+    // Create a instance from a buffer of `u32` data.
+    pub fn from_u32(src: &[u32], width: i32, mask_color: u32) -> Self {
+        // TODO optimize
+
+        let height = src.len() as i32 / width;
+
+        let pixels = (width * height) as usize;
+        let mut color: Vec<u32> = vec![0; pixels];
+        let mut mask: Vec<u32> = vec![0; pixels];
+
+        // Add 0xFF to the beginning of the mask so we can use that in the equality check
+        let mask_correct = mask_color | 0xFF000000;
+
+        for index in 0..src.len() {
+            let pixel = src[index];
+
+            // Convert pixel to u32
+            let raw = 0xFF000000 | pixel;
+
+            if raw == mask_correct {
+                mask[index] = 0xFFFFFF;
+            } else {
+                color[index] = raw;
+            }
+        }
+
+        BlitBuffer { 
+            width: width as i32,
+            height: height as i32,
+            color,
+            mask
+        }
+    }
+
     /// Saves the buffer to a file at the path specified.
     /// A custom binary format is used for this.
     pub fn save<P>(&self, path: P) -> Result<(), Box<Error>> where P: AsRef<Path> {
@@ -222,7 +256,8 @@ impl BlitExt for RgbImage {
             width: width as i32,
             height: height as i32,
             color,
-            mask }
+            mask
+        }
     }
 
     fn blit_with_mask_color(&self, dst: &mut Vec<u32>, dst_size: (i32, i32), offset: (i32, i32), mask_color: u32) {

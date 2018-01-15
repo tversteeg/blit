@@ -35,11 +35,11 @@ This should produce the following window:
 ```rust
 use blit::*;
 
-const WIDTH: usize = 180;
-const HEIGHT: usize = 180;
+const WIDTH: i32 = 180;
+const HEIGHT: i32 = 180;
 const MASK_COLOR: u32 = 0xFFFF00FF;
 
-let mut buffer: Vec<u32> = vec![0xFFFFFFFF; WIDTH * HEIGHT];
+let mut buffer: Vec<u32> = vec![0xFFFFFFFF; (WIDTH * HEIGHT) as usize];
 
 let img = image::open("examples/smiley.png").unwrap();
 let img_rgb = img.as_rgb8().unwrap();
