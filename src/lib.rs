@@ -9,7 +9,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! blit = "0.3"
+//! blit = "0.4"
 //! ```
 //!
 //! and this to your crate root:
@@ -23,27 +23,27 @@
 //! ```ignore
 //! extern crate image;
 //!
-//! const WIDTH: i32 = 180;
-//! const HEIGHT: i32 = 180;
-//! const MASK_COLOR: u32 = 0xFFFF00FF;
+//! const WIDTH: usize = 180;
+//! const HEIGHT: usize = 180;
+//! const MASK_COLOR: u32 = 0xFF00FF;
 //!
-//! let mut buffer: Vec<u32> = vec![0xFFFFFFFF; (WIDTH * HEIGHT) as usize];
+//! let mut buffer: Vec<u32> = vec![0xFFFFFFFF; WIDTH * HEIGHT];
 //!
 //! let img = image::open("examples/smiley.png").unwrap();
 //! let img_rgb = img.as_rgb8().unwrap();
 //!
 //! // Blit directly to the buffer
 //! let pos = (0, 0);
-//! img_rgb.blit_with_mask_color(&mut buffer, (WIDTH, HEIGHT), pos, MASK_COLOR);
+//! img_rgb.blit(&mut buffer, WIDTH, pos, Color::from_u32(MASK_COLOR));
 //!
 //! // Blit by creating a special blitting buffer first, this has some initial
 //! // overhead but is a lot faster after multiple calls
-//! let blit_buffer = img_rgb.as_blit_buffer(MASK_COLOR);
+//! let blit_buffer = img_rgb.to_blit_buffer(Color::from_u32(MASK_COLOR));
 //!
 //! let pos = (10, 10);
-//! blit_buffer.blit(&mut buffer, (WIDTH, HEIGHT), pos);
+//! blit_buffer.blit(&mut buffer, WIDTH, pos);
 //! let pos = (20, 20);
-//! blit_buffer.blit(&mut buffer, (WIDTH, HEIGHT), pos);
+//! blit_buffer.blit(&mut buffer, WIDTH, pos);
 //!
 //! // Save the blit buffer to a file
 //! blit_buffer.save("smiley.blit");
@@ -62,25 +62,72 @@ use std::error::Error;
 use image::*;
 use bincode::{serialize_into, deserialize, Infinite};
 
+/// A trait so that both `Color` and `u32` can do blitting operations.
+trait BlittablePrimitive {
+    /// First draw the mask as black on the background using an AND operation, and then draw the color using an OR operation.
+    fn blit(&mut self, color: Self, mask: Self);
+}
+
+/// A newtype representing the color in a buffer.
+///
+/// It is divided into alpha (not used), red, green & blue:
+/// 0xFF000000: alpha (not used)
+/// 0x00FF0000: red
+/// 0x0000FF00: green
+/// 0x000000FF: blue
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, Eq, PartialEq, Default)]
+pub struct Color(u32);
+
+impl Color {
+    /// Create a color from a 32 bits unsigned int, discard the alpha (last 8 bits).
+    pub fn from_u32(color: u32) -> Self {
+        Color(color | 0xFF000000)
+    }
+
+    /// Create a color from 3 8 bits unsigned ints and pack them into a 32 bit unsigned int.
+    pub fn from_u8(red: u8, green: u8, blue: u8) -> Self {
+        Color(0xFF000000 | (u32::from(red) << 16) | (u32::from(green) << 8) | u32::from(blue))
+    }
+
+    /// Return the wrapped `u32` object.
+    pub fn u32(&self) -> u32 {
+        self.0
+    }
+}
+
+impl BlittablePrimitive for Color {
+    fn blit(&mut self, color: Self, mask: Self) {
+        self.0 = self.0 & mask.0 | color.0;
+    }
+}
+
+impl BlittablePrimitive for u32 {
+    fn blit(&mut self, color: Self, mask: Self) {
+        *self = *self & mask | color;
+    }
+}
+
 /// A data structure holding a color and a mask buffer to make blitting on a buffer real fast.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct BlitBuffer {
     width: i32,
     height: i32,
 
-    color: Vec<u32>,
-    mask: Vec<u32>
+    color: Vec<Color>,
+    mask: Vec<Color>
 }
 
 impl BlitBuffer {
     /// Blit the image on a buffer using bitwise operations--this is a lot faster than
     /// `blit_with_mask_color`.
-    pub fn blit(&self, dst: &mut Vec<u32>, dst_size: (i32, i32), offset: (i32, i32)) {
+    pub fn blit(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32)) {
+        let dst_size = (dst_width as i32, (dst.len() / dst_width) as i32);
+
         if offset == (0, 0) && dst_size.0 == self.width && dst_size.1 == self.height {
             // If the sizes match and the buffers are aligned we don't have to do any special
             // bounds checks
             for (pixel, (color, mask)) in dst.iter_mut().zip(self.color.iter().zip(&self.mask)) {
-                *pixel = *pixel & *mask | *color;
+                pixel.blit(color.u32(), mask.u32());
             }
 
             return;
@@ -105,14 +152,17 @@ impl BlitBuffer {
                 let src_index = (src_x + src_y_index) as usize;
                 let dst_index = (dst_x + dst_y_index) as usize;
 
-                let dst_pixel = &mut dst[dst_index];
-                *dst_pixel = *dst_pixel & self.mask[src_index] | self.color[src_index];
+                // First draw the mask as black on the background using an AND operation, and then
+                // draw the colors using an OR operation
+                dst[dst_index].blit(self.color[src_index].u32(), self.mask[src_index].u32());
             }
         }
     }
 
     /// Blit a section of the image on a buffer.
-    pub fn blit_rect(&self, dst: &mut Vec<u32>, dst_size: (i32, i32), offset: (i32, i32), sub_rect: (i32, i32, i32, i32)) {
+    pub fn blit_rect(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), sub_rect: (i32, i32, i32, i32)) {
+        let dst_size = (dst_width as i32, (dst.len() / dst_width) as i32);
+
         let src_size = (self.width, self.height);
 
         let dst_start = (cmp::max(offset.0, 0),
@@ -132,47 +182,32 @@ impl BlitBuffer {
                 let src_index = (src_x + src_y_index) as usize;
                 let dst_index = (dst_x + dst_y_index) as usize;
 
-                let dst_pixel = &mut dst[dst_index];
-
                 // First draw the mask as black on the background using an AND operation, and then
                 // draw the colors using an OR operation
-                *dst_pixel = *dst_pixel & self.mask[src_index] | self.color[src_index];
+                dst[dst_index].blit(self.color[src_index].u32(), self.mask[src_index].u32());
             }
         }
     }
 
-    // Create a instance from a buffer of `u32` data.
-    pub fn from_u32(src: &[u32], width: i32, mask_color: u32) -> Self {
-        // TODO optimize
-
+    /// Create a instance from a buffer of `Color` data.
+    pub fn from_buffer(src: &[u32], width: i32, mask_color: Color) -> Self {
         let height = src.len() as i32 / width;
 
         let pixels = (width * height) as usize;
-        let mut color: Vec<u32> = vec![0; pixels];
-        let mut mask: Vec<u32> = vec![0; pixels];
-
-        // Add 0xFF to the beginning of the mask so we can use that in the equality check
-        let mask_correct = mask_color | 0xFF000000;
+        let mut color: Vec<Color> = vec![Color::from_u32(0); pixels];
+        let mut mask: Vec<Color> = vec![Color::from_u32(0); pixels];
 
         for index in 0..src.len() {
-            let pixel = src[index];
+            let pixel = Color::from_u32(src[index]);
 
-            // Convert pixel to u32
-            let raw = 0xFF000000 | pixel;
-
-            if raw == mask_correct {
-                mask[index] = 0xFFFFFF;
+            if pixel == mask_color {
+                mask[index] = Color::from_u32(0xFFFFFF);
             } else {
-                color[index] = raw;
+                color[index] = pixel;
             }
         }
 
-        BlitBuffer { 
-            width: width as i32,
-            height: height as i32,
-            color,
-            mask
-        }
+        BlitBuffer { width, height, color, mask }
     }
 
     /// Saves the buffer to a file at the path specified.
@@ -196,12 +231,12 @@ impl BlitBuffer {
         let mut data = Vec::new();
         file.read_to_end(&mut data)?;
 
-        BlitBuffer::load_from_memory(&data[..])
+        BlitBuffer::from_memory(&data[..])
     }
 
     /// Create a new buffer from a file at the path specified.
     /// The array needs to be the custom binary format.
-    pub fn load_from_memory(buffer: &[u8]) -> Result<Self, Box<Error>> {
+    pub fn from_memory(buffer: &[u8]) -> Result<Self, Box<Error>> {
         let buffer = deserialize(buffer)?;
 
         Ok(buffer)
@@ -217,33 +252,30 @@ impl BlitBuffer {
 pub trait BlitExt {
     /// Convert the image to a custom `BlitBuffer` type which is optimized for applying the
     /// blitting operations.
-    fn as_blit_buffer(&self, mask_color: u32) -> BlitBuffer;
+    fn to_blit_buffer(&self, mask_color: Color) -> BlitBuffer;
 
     /// Blit the image directly on a buffer.
-    fn blit_with_mask_color(&self, dst: &mut Vec<u32>, dst_size: (i32, i32), offset: (i32, i32), mask_color: u32);
+    fn blit(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), mask_color: Color);
 }
 
 impl BlitExt for RgbImage {
-    fn as_blit_buffer(&self, mask_color: u32) -> BlitBuffer {
+    fn to_blit_buffer(&self, mask_color: Color) -> BlitBuffer {
         let (width, height) = self.dimensions();
 
         let pixels = (width * height) as usize;
-        let mut color: Vec<u32> = vec![0; pixels];
-        let mut mask: Vec<u32> = vec![0; pixels];
-
-        // Add 0xFF to the beginning of the mask so we can use that in the equality check
-        let mask_correct = mask_color | 0xFF000000;
+        let mut color: Vec<Color> = vec![Color::from_u32(0); pixels];
+        let mut mask: Vec<Color> = vec![Color::from_u32(0); pixels];
 
         let mut index = 0;
         for y in 0..height {
             for x in 0..width {
                 let pixel = self.get_pixel(x, y).data;
 
-                // Convert pixel to u32
-                let raw = 0xFF000000 | ((pixel[0] as u32) << 16) | ((pixel[1] as u32) << 8) | (pixel[2] as u32);
+                // Convert pixel to Color
+                let raw = Color::from_u8(pixel[0], pixel[1], pixel[2]);
 
-                if raw == mask_correct {
-                    mask[index] = 0xFFFFFF;
+                if raw == mask_color {
+                    mask[index] = Color::from_u32(0xFFFFFF);
                 } else {
                     color[index] = raw;
                 }
@@ -260,11 +292,10 @@ impl BlitExt for RgbImage {
         }
     }
 
-    fn blit_with_mask_color(&self, dst: &mut Vec<u32>, dst_size: (i32, i32), offset: (i32, i32), mask_color: u32) {
-        let (width, height) = self.dimensions();
+    fn blit(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), mask_color: Color) {
+        let dst_size = (dst_width as i32, (dst.len() / dst_width) as i32);
 
-        // Add 0xFF to the beginning of the mask so we can use that in the equality check
-        let mask_correct = mask_color | 0xFF000000;
+        let (width, height) = self.dimensions();
 
         // Make sure only the pixels get rendered that are inside the dst
         let min_x = cmp::max(-offset.0, 0);
@@ -277,18 +308,18 @@ impl BlitExt for RgbImage {
             for x in min_x..max_x {
                 let pixel = self.get_pixel(x as u32, y as u32).data;
 
-                // Convert pixel to u32
-                let raw = 0xFF000000 | ((pixel[0] as u32) << 16) | ((pixel[1] as u32) << 8) | (pixel[2] as u32);
+                // Convert pixel to Color
+                let raw = Color::from_u8(pixel[0], pixel[1], pixel[2]);
 
                 // Check if the pixel isn't the mask
-                if raw != mask_correct {
+                if raw != mask_color {
                     // Apply the offsets
                     let dst_x = (x + offset.0) as usize;
                     let dst_y = (y + offset.1) as usize;
 
                     // Calculate the index
                     let index = dst_x + dst_y * dst_size.0 as usize;
-                    dst[index] = raw;
+                    dst[index] = raw.u32();
                 }
             }
         }

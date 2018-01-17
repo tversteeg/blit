@@ -11,7 +11,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-blit = "0.3"
+blit = "0.4"
 ```
 
 And this to your crate root:
@@ -33,27 +33,32 @@ This should produce the following window:
 ## Examples
 
 ```rust
+extern crate image;
+
 use blit::*;
 
-const WIDTH: i32 = 180;
-const HEIGHT: i32 = 180;
-const MASK_COLOR: u32 = 0xFFFF00FF;
+const WIDTH: usize = 180;
+const HEIGHT: usize = 180;
+const MASK_COLOR: u32 = 0xFF00FF;
 
-let mut buffer: Vec<u32> = vec![0xFFFFFFFF; (WIDTH * HEIGHT) as usize];
+let mut buffer: Vec<u32> = vec![0xFFFFFFFF; WIDTH * HEIGHT];
 
 let img = image::open("examples/smiley.png").unwrap();
 let img_rgb = img.as_rgb8().unwrap();
 
 // Blit directly to the buffer
 let pos = (0, 0);
-img_rgb.blit_with_mask_color(&mut buffer, (WIDTH, HEIGHT), pos, MASK_COLOR);
+img_rgb.blit(&mut buffer, WIDTH, pos, Color::from_u32(MASK_COLOR));
 
 // Blit by creating a special blitting buffer first, this has some initial
 // overhead but is a lot faster after multiple calls
-let blit_buffer = img_rgb.as_blit_buffer(MASK_COLOR);
+let blit_buffer = img_rgb.to_blit_buffer(Color::from_u32(MASK_COLOR));
 
 let pos = (10, 10);
-blit_buffer.blit(&mut buffer, (WIDTH, HEIGHT), pos);
+blit_buffer.blit(&mut buffer, WIDTH, pos);
 let pos = (20, 20);
-blit_buffer.blit(&mut buffer, (WIDTH, HEIGHT), pos);
+blit_buffer.blit(&mut buffer, WIDTH, pos);
+
+// Save the blit buffer to a file
+blit_buffer.save("smiley.blit");
 ```
