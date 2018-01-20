@@ -16,11 +16,14 @@ categories = ["games", "rendering", "game-engines", "multimedia"]
 [badges]
 travis-ci = {repository = "tversteeg/blit"}
 
+[features]
+default = ["image"]
+
 [dependencies]
-image = "0.18"
 bincode = "0.9"
 serde = "1.0"
 serde_derive = "1.0"
+image = { version = "0.18", optional = true }
 
 [[example]]
 name = "smiley"
