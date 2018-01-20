@@ -95,9 +95,9 @@ impl BlitExt for RgbaImage {
                 let pixel = self.get_pixel(x, y).data;
 
                 // Convert pixel to Color
-                let raw = Color::from_u8(pixel[1], pixel[2], pixel[3]);
+                let raw = Color::from_u8(pixel[0], pixel[1], pixel[2]);
 
-                if raw == mask_color || pixel[0] < RGBA_ALPHA_TRESHOLD {
+                if raw == mask_color || pixel[3] < RGBA_ALPHA_TRESHOLD {
                     mask[index] = Color::from_u32(0xFFFFFF);
                 } else {
                     color[index] = raw;
@@ -132,10 +132,10 @@ impl BlitExt for RgbaImage {
                 let pixel = self.get_pixel(x as u32, y as u32).data;
 
                 // Convert pixel to Color
-                let raw = Color::from_u8(pixel[1], pixel[2], pixel[3]);
+                let raw = Color::from_u8(pixel[0], pixel[1], pixel[2]);
 
                 // Check if the pixel isn't the mask
-                if raw != mask_color || pixel[0] >= RGBA_ALPHA_TRESHOLD {
+                if raw != mask_color && pixel[3] >= RGBA_ALPHA_TRESHOLD {
                     // Apply the offsets
                     let dst_x = (x + offset.0) as usize;
                     let dst_y = (y + offset.1) as usize;

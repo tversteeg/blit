@@ -14,15 +14,21 @@ const MASK_COLOR: u32 = 0xFF00FF;
 fn main() {
     let mut buffer: Vec<u32> = vec![0x00FFFFFF; WIDTH * HEIGHT];
 
-    let img = image::open("examples/smiley.png").unwrap();
-    println!("Loaded image with size {:?}", img.dimensions());
-
     let options = WindowOptions {
         scale: Scale::X2,
         ..WindowOptions::default()
     };
     let mut window = Window::new("Blit Example - ESC to exit & click to draw", WIDTH, HEIGHT, options).expect("Unable to open window");
 
+    let img = image::open("examples/smiley_rgba.png").unwrap();
+    println!("Loaded RGBA image with size {:?}", img.dimensions());
+    let img_size = img.dimensions();
+
+    let rgb = img.as_rgba8().unwrap();
+    rgb.blit(&mut buffer, WIDTH, (img_size.0 as i32, 0), Color::from_u32(MASK_COLOR));
+
+    let img = image::open("examples/smiley_rgb.png").unwrap();
+    println!("Loaded RGB image with size {:?}", img.dimensions());
     let img_size = img.dimensions();
 
     let rgb = img.as_rgb8().unwrap();
