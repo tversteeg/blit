@@ -3,16 +3,6 @@ use image::*;
 
 const RGBA_ALPHA_TRESHOLD: u8 = 127;
 
-/// A trait adding blitting functions to image types.
-pub trait BlitExt {
-    /// Convert the image to a custom `BlitBuffer` type which is optimized for applying the
-    /// blitting operations.
-    fn to_blit_buffer(&self, mask_color: Color) -> BlitBuffer;
-
-    /// Blit the image directly on a buffer.
-    fn blit(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), mask_color: Color);
-}
-
 impl BlitExt for RgbImage {
     fn to_blit_buffer(&self, mask_color: Color) -> BlitBuffer {
         let (width, height) = self.dimensions();

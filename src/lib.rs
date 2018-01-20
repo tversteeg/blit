@@ -61,7 +61,6 @@ use std::error::Error;
 use bincode::{serialize_into, deserialize, Infinite};
 
 #[cfg(feature = "image")] pub mod image_feature;
-#[cfg(feature = "image")] pub use image_feature::BlitExt as BlitExt;
 
 /// A trait so that both `Color` and `u32` can do blitting operations.
 trait BlittablePrimitive {
@@ -247,4 +246,14 @@ impl BlitBuffer {
     pub fn size(&self) -> (i32, i32) {
         (self.width, self.height)
     }
+}
+
+/// A trait adding blitting functions to image types.
+pub trait BlitExt {
+    /// Convert the image to a custom `BlitBuffer` type which is optimized for applying the
+    /// blitting operations.
+    fn to_blit_buffer(&self, mask_color: Color) -> BlitBuffer;
+
+    /// Blit the image directly on a buffer.
+    fn blit(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), mask_color: Color);
 }
