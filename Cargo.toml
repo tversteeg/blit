@@ -20,7 +20,7 @@ travis-ci = {repository = "tversteeg/blit"}
 default = ["image"]
 
 [dependencies]
-bincode = "0.9"
+bincode = "1.0"
 serde = "1.0"
 serde_derive = "1.0"
 image = { version = "0.18", optional = true }

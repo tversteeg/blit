@@ -58,9 +58,9 @@ use std::io::{BufWriter, Read};
 use std::fs::File;
 use std::path::Path;
 use std::error::Error;
-use bincode::{serialize_into, deserialize, Infinite};
+use bincode::{serialize_into, deserialize};
 
-#[cfg(feature = "image")] pub mod image_feature;
+#[cfg(feature = "image")]#[doc(hidden)] pub mod image_feature;
 
 /// A trait so that both `Color` and `u32` can do blitting operations.
 trait BlittablePrimitive {
@@ -216,7 +216,7 @@ impl BlitBuffer {
         let mut file = File::create(path)?;
         {
             let mut writer = BufWriter::new(&mut file);
-            serialize_into(&mut writer, &self, Infinite)?;
+            serialize_into(&mut writer, &self)?;
         }
         file.sync_all()?;
 
