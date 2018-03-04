@@ -7,9 +7,10 @@ extern crate serde_json;
 use blit::*;
 use minifb::*;
 use std::fs::File;
+use std::time::SystemTime;
 
-const WIDTH: usize = 250;
-const HEIGHT: usize = 250;
+const WIDTH: usize = 512;
+const HEIGHT: usize = 120;
 
 const MASK_COLOR: u32 = 0xFF00FF;
 
@@ -33,11 +34,41 @@ fn main() {
     let info: aseprite::SpritesheetData = serde_json::from_reader(file).unwrap();
 
     // Create the animation buffer object
-    let anim = AnimationBlitBuffer::new(blit_buf, info);
+    let anim_buffer = AnimationBlitBuffer::new(blit_buf, info);
 
+    // Create the animations using hardcoded frames
+    let mut walk_anim = Animation::start(0, 3, true);
+    let mut jump_anim = Animation::start(4, 7, true);
+    let mut full_anim = Animation::start(0, 11, true);
+
+    // Create the animation using a tag name
+    let mut run_anim = Animation::start_from_tag(&anim_buffer, "Walk".to_string(), true).unwrap();
+
+    let mut time = SystemTime::now();
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        anim.blit_frame(&mut buffer, WIDTH, (0, 0), 0).unwrap();
+        for i in buffer.iter_mut() {
+            *i = 0x00FFFFFF;
+        }
+
+        // Update the animations to go to the correct frame
+        walk_anim.update(&anim_buffer, time.elapsed().unwrap()).unwrap();
+        jump_anim.update(&anim_buffer, time.elapsed().unwrap()).unwrap();
+        run_anim.update(&anim_buffer, time.elapsed().unwrap()).unwrap();
+        full_anim.update(&anim_buffer, time.elapsed().unwrap()).unwrap();
+
+        // Render the frames
+        anim_buffer.blit(&mut buffer, WIDTH, (4, 4), &walk_anim).unwrap();
+        anim_buffer.blit(&mut buffer, WIDTH, (36, 4), &jump_anim).unwrap();
+        anim_buffer.blit(&mut buffer, WIDTH, (68, 4), &run_anim).unwrap();
+        anim_buffer.blit(&mut buffer, WIDTH, (4, 68), &full_anim).unwrap();
+
+        // Draw all the frames separately
+        for i in 0..11 {
+            anim_buffer.blit_frame(&mut buffer, WIDTH, (32 * i + 4, 36), i as usize).unwrap();
+        }
 
         window.update_with_buffer(&buffer).unwrap();
+
+        time = SystemTime::now();
     }
 }
