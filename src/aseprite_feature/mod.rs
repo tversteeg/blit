@@ -130,7 +130,40 @@ impl AnimationBlitBuffer {
         Ok(())
     }
 
+    /// Draw the current frame using the animation info.
     pub fn blit(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), info: &Animation) -> Result<(), Box<Error>> {
         self.blit_frame(dst, dst_width, offset, info.frame_current)
+    }
+
+    /// Saves the buffer to a file at the path specified.
+    /// A custom binary format is used for this.
+    pub fn save<P>(&self, path: P) -> Result<(), Box<Error>> where P: AsRef<Path> {
+        let mut file = File::create(path)?;
+        {
+            let mut writer = BufWriter::new(&mut file);
+            serialize_into(&mut writer, &self)?;
+        }
+        file.sync_all()?;
+
+        Ok(())
+    }
+
+    /// Create a new buffer from a file at the path specified.
+    /// The file needs to be the custom binary format.
+    pub fn open<P>(path: P) -> Result<Self, Box<Error>> where P: AsRef<Path> {
+        let mut file = File::open(path)?;
+
+        let mut data = Vec::new();
+        file.read_to_end(&mut data)?;
+
+        AnimationBlitBuffer::from_memory(&data[..])
+    }
+
+    /// Create a new buffer from a file at the path specified.
+    /// The array needs to be the custom binary format.
+    pub fn from_memory(buffer: &[u8]) -> Result<Self, Box<Error>> {
+        let buffer = deserialize(buffer)?;
+
+        Ok(buffer)
     }
 }

@@ -11,7 +11,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-blit = "0.4"
+blit = "0.5"
 ```
 
 And this to your crate root:

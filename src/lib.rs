@@ -9,7 +9,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! blit = "0.4"
+//! blit = "0.5"
 //! ```
 //!
 //! and this to your crate root:
