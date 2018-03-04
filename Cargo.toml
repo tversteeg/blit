@@ -17,17 +17,23 @@ categories = ["games", "rendering", "game-engines", "multimedia"]
 travis-ci = {repository = "tversteeg/blit"}
 
 [features]
-default = ["image"]
+default = ["image", "aseprite"]
 
 [dependencies]
 bincode = "1.0"
 serde = "1.0"
 serde_derive = "1.0"
 image = { version = "0.18", optional = true }
+aseprite = { version = "0.1", optional = true }
 
 [[example]]
 name = "smiley"
 path = "examples/smiley.rs"
 
+[[example]]
+name = "aseprite"
+path = "examples/aseprite.rs"
+
 [dev-dependencies]
 minifb = "0.10"
+serde_json = "1.0"

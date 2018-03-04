@@ -52,6 +52,7 @@
 extern crate bincode;
 #[macro_use] extern crate serde_derive;
 #[cfg(feature = "image")] extern crate image;
+#[cfg(feature = "aseprite")] extern crate aseprite;
 
 use std::cmp;
 use std::io::{BufWriter, Read};
@@ -61,6 +62,8 @@ use std::error::Error;
 use bincode::{serialize_into, deserialize};
 
 #[cfg(feature = "image")]#[doc(hidden)] pub mod image_feature;
+#[cfg(feature = "aseprite")] pub mod aseprite_feature;
+#[cfg(feature = "aseprite")] pub use aseprite_feature::AnimationBlitBuffer;
 
 /// A trait so that both `Color` and `u32` can do blitting operations.
 trait BlittablePrimitive {
