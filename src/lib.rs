@@ -50,6 +50,7 @@
 //! ```
 
 extern crate bincode;
+extern crate rayon;
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate quick_error;
 #[cfg(feature = "image")] extern crate image;
@@ -61,6 +62,7 @@ use std::fs::File;
 use std::path::Path;
 use std::error::Error;
 use bincode::{serialize_into, deserialize};
+use rayon::prelude::*;
 
 #[cfg(feature = "image")]#[doc(hidden)] pub mod image_feature;
 #[cfg(feature = "aseprite")] pub mod aseprite_feature;
@@ -144,7 +146,7 @@ impl BlitBuffer {
         let dst_end = (cmp::min(offset.0 + src_size.0, dst_size.0),
                        cmp::min(offset.1 + src_size.1, dst_size.1));
 
-        for dst_y in dst_start.1..dst_end.1 {
+        (dst_start.1..dst_end.1).into_par_iter().map(|dst_y| {
             let src_y = dst_y - offset.1;
             
             let dst_y_index = dst_y * dst_size.0;
@@ -160,7 +162,7 @@ impl BlitBuffer {
                 // draw the colors using an OR operation
                 dst[dst_index].blit(self.color[src_index].u32(), self.mask[src_index].u32());
             }
-        }
+        });
     }
 
     /// Blit a section of the image on a buffer.
