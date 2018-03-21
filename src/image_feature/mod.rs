@@ -8,8 +8,7 @@ impl BlitExt for RgbImage {
         let (width, height) = self.dimensions();
 
         let pixels = (width * height) as usize;
-        let mut color: Vec<Color> = vec![Color::from_u32(0); pixels];
-        let mut mask: Vec<Color> = vec![Color::from_u32(0); pixels];
+        let mut data: Vec<(Color, Color)> = vec![(Color::from_u32(0), Color::from_u32(0)); pixels];
 
         let mut index = 0;
         for y in 0..height {
@@ -20,9 +19,9 @@ impl BlitExt for RgbImage {
                 let raw = Color::from_u8(pixel[0], pixel[1], pixel[2]);
 
                 if raw == mask_color {
-                    mask[index] = Color::from_u32(0xFFFFFF);
+                    data[index].1 = Color::from_u32(0xFFFFFF);
                 } else {
-                    color[index] = raw;
+                    data[index].0 = raw;
                 }
 
                 index += 1;
@@ -32,8 +31,7 @@ impl BlitExt for RgbImage {
         BlitBuffer { 
             width: width as i32,
             height: height as i32,
-            color,
-            mask
+            data
         }
     }
 
@@ -76,8 +74,7 @@ impl BlitExt for RgbaImage {
         let (width, height) = self.dimensions();
 
         let pixels = (width * height) as usize;
-        let mut color: Vec<Color> = vec![Color::from_u32(0); pixels];
-        let mut mask: Vec<Color> = vec![Color::from_u32(0); pixels];
+        let mut data: Vec<(Color, Color)> = vec![(Color::from_u32(0), Color::from_u32(0)); pixels];
 
         let mut index = 0;
         for y in 0..height {
@@ -88,9 +85,9 @@ impl BlitExt for RgbaImage {
                 let raw = Color::from_u8(pixel[0], pixel[1], pixel[2]);
 
                 if raw == mask_color || pixel[3] < RGBA_ALPHA_TRESHOLD {
-                    mask[index] = Color::from_u32(0xFFFFFF);
+                    data[index].1 = Color::from_u32(0xFFFFFF);
                 } else {
-                    color[index] = raw;
+                    data[index].0 = raw;
                 }
 
                 index += 1;
@@ -100,8 +97,7 @@ impl BlitExt for RgbaImage {
         BlitBuffer { 
             width: width as i32,
             height: height as i32,
-            color,
-            mask
+            data
         }
     }
 

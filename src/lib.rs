@@ -119,34 +119,33 @@ pub struct BlitBuffer {
     width: i32,
     height: i32,
 
-    color: Vec<Color>,
-    mask: Vec<Color>
+    // The first field of the tuple is the color, the second the mask
+    data: Vec<(Color, Color)>
 }
 
 impl BlitBuffer {
     /// Blit the image on a buffer using bitwise operations--this is a lot faster than
     /// `blit_with_mask_color`.
     pub fn blit(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32)) {
+        let src_size = (self.width, self.height);
         let dst_size = (dst_width as i32, (dst.len() / dst_width) as i32);
 
-        if offset == (0, 0) && dst_size.0 == self.width && dst_size.1 == self.height {
+        if offset == (0, 0) && dst_size == src_size {
             // If the sizes match and the buffers are aligned we don't have to do any special
             // bounds checks
-            for (pixel, (color, mask)) in dst.iter_mut().zip(self.color.iter().zip(&self.mask)) {
-                pixel.blit(color.u32(), mask.u32());
+            for (pixel, data) in dst.iter_mut().zip(self.data.iter()) {
+                pixel.blit(data.0.u32(), data.1.u32());
             }
 
             return;
         }
-
-        let src_size = (self.width, self.height);
 
         let dst_start = (cmp::max(offset.0, 0),
                          cmp::max(offset.1, 0));
         let dst_end = (cmp::min(offset.0 + src_size.0, dst_size.0),
                        cmp::min(offset.1 + src_size.1, dst_size.1));
 
-        (dst_start.1..dst_end.1).into_par_iter().map(|dst_y| {
+        for dst_y in dst_start.1..dst_end.1 {
             let src_y = dst_y - offset.1;
             
             let dst_y_index = dst_y * dst_size.0;
@@ -160,9 +159,10 @@ impl BlitBuffer {
 
                 // First draw the mask as black on the background using an AND operation, and then
                 // draw the colors using an OR operation
-                dst[dst_index].blit(self.color[src_index].u32(), self.mask[src_index].u32());
+                let (color, mask) = self.data[src_index];
+                dst[dst_index].blit(color.u32(), mask.u32());
             }
-        });
+        }
     }
 
     /// Blit a section of the image on a buffer.
@@ -190,7 +190,8 @@ impl BlitBuffer {
 
                 // First draw the mask as black on the background using an AND operation, and then
                 // draw the colors using an OR operation
-                dst[dst_index].blit(self.color[src_index].u32(), self.mask[src_index].u32());
+                let (color, mask) = self.data[src_index];
+                dst[dst_index].blit(color.u32(), mask.u32());
             }
         }
     }
@@ -200,20 +201,21 @@ impl BlitBuffer {
         let height = src.len() as i32 / width;
 
         let pixels = (width * height) as usize;
-        let mut color: Vec<Color> = vec![Color::from_u32(0); pixels];
-        let mut mask: Vec<Color> = vec![Color::from_u32(0); pixels];
+        let mut data: Vec<(Color, Color)> = vec![(Color::from_u32(0), Color::from_u32(0)); pixels];
 
         for index in 0..src.len() {
             let pixel = Color::from_u32(src[index]);
 
             if pixel == mask_color {
-                mask[index] = Color::from_u32(0xFFFFFF);
+                // Set the mask
+                data[index].1 = Color::from_u32(0xFFFFFF);
             } else {
-                color[index] = pixel;
+                // Set the color
+                data[index].0 = pixel;
             }
         }
 
-        BlitBuffer { width, height, color, mask }
+        BlitBuffer { width, height, data }
     }
 
     /// Saves the buffer to a file at the path specified.
