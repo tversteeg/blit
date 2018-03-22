@@ -133,9 +133,9 @@ impl BlitBuffer {
         if offset == (0, 0) && dst_size == src_size {
             // If the sizes match and the buffers are aligned we don't have to do any special
             // bounds checks
-            for (pixel, data) in dst.iter_mut().zip(self.data.iter()) {
-                pixel.blit(data.0.u32(), data.1.u32());
-            }
+            dst.par_iter_mut().zip(&self.data[..]).for_each(|(pixel, &(color, mask))| {
+                pixel.blit(color.u32(), mask.u32());
+            });
 
             return;
         }
