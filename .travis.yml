@@ -16,5 +16,5 @@ env:
   - FEATURES="aseprite"
   - FEATURES="image aseprite"
 script:
-  - cargo build --verbose --no-default-features --features "$FEATURES"
-  - cargo test --verbose --no-default-features --features "$FEATURES"
+  - cargo build --no-default-features --features "$FEATURES"
+  - cargo test --no-default-features --features "$FEATURES"
