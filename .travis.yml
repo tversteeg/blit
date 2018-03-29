@@ -9,3 +9,12 @@ addons:
   apt:
     packages:
       - xorg-dev
+
+env:
+  - FEATURES=""
+  - FEATURES="image"
+  - FEATURES="aseprite"
+  - FEATURES="image aseprite"
+script:
+  - cargo build --no-default-features --features "$FEATURES"
+  - cargo test --no-default-features --features "$FEATURES"

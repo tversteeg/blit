@@ -1,8 +1,9 @@
 extern crate blit;
-extern crate image;
 extern crate minifb;
-extern crate aseprite;
 extern crate serde_json;
+extern crate image;
+#[cfg(all(feature="aseprite", feature="image"))]
+extern crate aseprite;
 
 use blit::*;
 use minifb::*;
@@ -14,6 +15,7 @@ const HEIGHT: usize = 120;
 
 const MASK_COLOR: u32 = 0xFF00FF;
 
+#[cfg(all(feature="aseprite", feature="image"))]
 fn main() {
     let mut buffer: Vec<u32> = vec![0x00FFFFFF; WIDTH * HEIGHT];
 
@@ -71,4 +73,9 @@ fn main() {
 
         time = SystemTime::now();
     }
+}
+
+#[cfg(not(all(feature="aseprite", feature="image")))]
+fn main() {
+    // Ignore this example when not using image
 }

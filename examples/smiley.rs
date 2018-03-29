@@ -1,6 +1,6 @@
 extern crate blit;
-extern crate image;
 extern crate minifb;
+extern crate image;
 
 use blit::*;
 use minifb::*;
@@ -11,7 +11,9 @@ const HEIGHT: usize = 250;
 
 const MASK_COLOR: u32 = 0xFF00FF;
 
+#[cfg(feature="image")]
 fn main() {
+
     let mut buffer: Vec<u32> = vec![0x00FFFFFF; WIDTH * HEIGHT];
 
     let options = WindowOptions {
@@ -71,4 +73,9 @@ fn main() {
 
         window.update_with_buffer(&buffer).unwrap();
     }
+}
+
+#[cfg(not(feature="image"))]
+fn main() {
+    // Ignore this example when not using image
 }
