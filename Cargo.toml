@@ -11,7 +11,7 @@ documentation = "https://docs.rs/blit"
 
 repository = "https://github.com/tversteeg/blit.git"
 keywords = ["image", "gamedev", "sprite", "blitting"]
-categories = ["games", "rendering", "game-engines", "multimedia"]
+categories = ["games", "rendering::data-formats", "game-engines", "multimedia::images"]
 
 [badges]
 travis-ci = {repository = "tversteeg/blit"}
