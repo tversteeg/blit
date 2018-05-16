@@ -13,7 +13,6 @@ const MASK_COLOR: u32 = 0xFF00FF;
 
 #[cfg(feature="image")]
 fn main() {
-
     let mut buffer: Vec<u32> = vec![0x00FFFFFF; WIDTH * HEIGHT];
 
     let options = WindowOptions {
@@ -36,7 +35,11 @@ fn main() {
     let rgb = img.as_rgb8().unwrap();
     rgb.blit(&mut buffer, WIDTH, (0, 0), Color::from_u32(0xFFFFFF));
 
+    // Convert the image to a specific blit buffer type which is a lot faster
     let blit_buf = rgb.to_blit_buffer(Color::from_u32(MASK_COLOR));
+
+    // It's not necessarily to use the `as_rgb*` for this
+    let blit_buf = blit_buffer(&img, Color::from_u32(MASK_COLOR));
 
     // Save the buffer to disk and load it again
     blit_buf.save("smiley.blit").unwrap();

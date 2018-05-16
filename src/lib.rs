@@ -54,6 +54,7 @@ extern crate rayon;
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate quick_error;
 #[cfg(feature="image")] extern crate image;
+#[cfg(feature="image")] extern crate num_traits;
 #[cfg(feature="aseprite")] extern crate aseprite;
 
 use std::cmp;
@@ -65,6 +66,7 @@ use bincode::{serialize_into, deserialize};
 use rayon::prelude::*;
 
 #[cfg(feature="image")] pub mod image_feature;
+#[cfg(feature="image")] pub use image_feature::*;
 #[cfg(feature="aseprite")] pub mod aseprite_feature;
 #[cfg(feature="aseprite")] pub use aseprite_feature::*;
 

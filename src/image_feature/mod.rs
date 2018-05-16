@@ -1,7 +1,51 @@
 use super::*;
 use image::*;
+use num_traits::NumCast;
 
 const RGBA_ALPHA_TRESHOLD: u8 = 127;
+
+/// Create a `BlitBuffer` type from a generic image type so a `as_rgb*` step is not needed.
+pub fn blit_buffer<I, P, S>(image: &I, mask_color: Color) -> BlitBuffer
+where
+    I: GenericImage<Pixel = P>,
+    P: Pixel<Subpixel = S> + 'static,
+    S: Primitive + 'static
+{
+    let (width, height) = image.dimensions();
+
+    let pixels = (width * height) as usize;
+    let mut data: Vec<(Color, Color)> = vec![(Color::from_u32(0), Color::from_u32(0)); pixels];
+
+    let mut index = 0;
+    for y in 0..height {
+        for x in 0..width {
+            let p = image.get_pixel(x, y).channels4();
+            let pixel: (u8, u8, u8, u8) = (
+                NumCast::from(p.0).unwrap(),
+                NumCast::from(p.1).unwrap(),
+                NumCast::from(p.2).unwrap(),
+                NumCast::from(p.3).unwrap()
+            );
+
+            // Convert pixel to Color
+            let raw = Color::from_u8(pixel.0, pixel.1, pixel.2);
+
+            if raw == mask_color || pixel.3 < RGBA_ALPHA_TRESHOLD {
+                data[index].1 = Color::from_u32(0xFFFFFF);
+            } else {
+                data[index].0 = raw;
+            }
+
+            index += 1;
+        }
+    }
+
+    BlitBuffer { 
+        width: width as i32,
+        height: height as i32,
+        data
+    }
+}
 
 impl BlitExt for RgbImage {
     fn to_blit_buffer(&self, mask_color: Color) -> BlitBuffer {
