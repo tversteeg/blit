@@ -52,7 +52,7 @@
 extern crate bincode;
 extern crate rayon;
 #[macro_use] extern crate serde_derive;
-extern crate quick_error;
+#[macro_use] extern crate quick_error;
 #[cfg(feature="image")] extern crate image;
 #[cfg(feature="image")] extern crate num_traits;
 #[cfg(feature="aseprite")] extern crate aseprite;
