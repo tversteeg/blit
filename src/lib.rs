@@ -52,7 +52,7 @@
 extern crate bincode;
 extern crate rayon;
 #[macro_use] extern crate serde_derive;
-#[macro_use] extern crate quick_error;
+extern crate quick_error;
 #[cfg(feature="image")] extern crate image;
 #[cfg(feature="image")] extern crate num_traits;
 #[cfg(feature="aseprite")] extern crate aseprite;
@@ -149,7 +149,7 @@ impl BlitBuffer {
 
         for dst_y in dst_start.1..dst_end.1 {
             let src_y = dst_y - offset.1;
-            
+
             let dst_y_index = dst_y * dst_size.0;
             let src_y_index = src_y * src_size.0;
 
@@ -180,7 +180,7 @@ impl BlitBuffer {
 
         for dst_y in dst_start.1..dst_end.1 {
             let src_y = dst_y - offset.1 + sub_rect.1;
-            
+
             let dst_y_index = dst_y * dst_size.0;
             let src_y_index = src_y * src_size.0;
 
