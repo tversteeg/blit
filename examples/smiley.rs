@@ -4,7 +4,7 @@ extern crate image;
 
 use blit::*;
 use minifb::*;
-use image::GenericImage;
+use image::GenericImageView;
 
 const WIDTH: usize = 250;
 const HEIGHT: usize = 250;
