@@ -26,7 +26,7 @@ serde = "1.0"
 serde_derive = "1.0"
 quick-error = "1.2"
 num-traits = "0.2"
-image = { version = "0.20", optional = true }
+image = { version = "0.22", optional = true }
 aseprite = { version = "0.1", optional = true }
 
 [[example]]
@@ -38,6 +38,6 @@ name = "aseprite"
 path = "examples/aseprite.rs"
 
 [dev-dependencies]
-image = "0.20"
+image = "0.22"
 minifb = "0.12"
 serde_json = "1.0"
