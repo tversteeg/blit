@@ -8,7 +8,7 @@ quick_error! {
         NoFrameTagsInMetadata {
             description("no frame tags field in metadata")
         }
-    
+
         NoMatchingTag {
             description("no tag found which is equal to the passed tag")
         }
@@ -62,7 +62,7 @@ impl Animation {
     }
 
     /// Update the animation with the time and set the current frame to the correct one.
-    pub fn update(&mut self, buffer: &AnimationBlitBuffer, dt: Duration) -> Result<AnimationStatus, Box<Error>> {
+    pub fn update(&mut self, buffer: &AnimationBlitBuffer, dt: Duration) -> Result<AnimationStatus, Box<dyn Error>> {
         // If the animation is not repeating and already passed the end point return it as stopped.
         if !self.repeat && self.frame_current > self.frame_end {
             return Ok(AnimationStatus::Stopped);
@@ -94,7 +94,7 @@ impl Animation {
                 return Ok(AnimationStatus::Stopped);
             }
         }
-        
+
         if self.repeat {
             return Ok(AnimationStatus::Repeat);
         }
@@ -118,7 +118,7 @@ impl AnimationBlitBuffer {
     }
 
     /// Draw one frame from the animation.
-    pub fn blit_frame(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), frame: usize) -> Result<(), Box<Error>> {
+    pub fn blit_frame(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), frame: usize) -> Result<(), Box<dyn Error>> {
         let frame = &self.info.frames[frame];
 
         let rect = (frame.frame.x as i32,
@@ -131,13 +131,13 @@ impl AnimationBlitBuffer {
     }
 
     /// Draw the current frame using the animation info.
-    pub fn blit(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), info: &Animation) -> Result<(), Box<Error>> {
+    pub fn blit(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), info: &Animation) -> Result<(), Box<dyn Error>> {
         self.blit_frame(dst, dst_width, offset, info.frame_current)
     }
 
     /// Saves the buffer to a file at the path specified.
     /// A custom binary format is used for this.
-    pub fn save<P>(&self, path: P) -> Result<(), Box<Error>> where P: AsRef<Path> {
+    pub fn save<P>(&self, path: P) -> Result<(), Box<dyn Error>> where P: AsRef<Path> {
         let mut file = File::create(path)?;
         {
             let mut writer = BufWriter::new(&mut file);
@@ -150,7 +150,7 @@ impl AnimationBlitBuffer {
 
     /// Create a new buffer from a file at the path specified.
     /// The file needs to be the custom binary format.
-    pub fn open<P>(path: P) -> Result<Self, Box<Error>> where P: AsRef<Path> {
+    pub fn open<P>(path: P) -> Result<Self, Box<dyn Error>> where P: AsRef<Path> {
         let mut file = File::open(path)?;
 
         let mut data = Vec::new();
@@ -161,7 +161,7 @@ impl AnimationBlitBuffer {
 
     /// Create a new buffer from a file at the path specified.
     /// The array needs to be the custom binary format.
-    pub fn from_memory(buffer: &[u8]) -> Result<Self, Box<Error>> {
+    pub fn from_memory(buffer: &[u8]) -> Result<Self, Box<dyn Error>> {
         let buffer = deserialize(buffer)?;
 
         Ok(buffer)

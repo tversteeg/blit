@@ -40,7 +40,7 @@ where
         }
     }
 
-    BlitBuffer { 
+    BlitBuffer {
         width: width as i32,
         height: height as i32,
         data
@@ -57,7 +57,7 @@ impl BlitExt for RgbImage {
         let mut index = 0;
         for y in 0..height {
             for x in 0..width {
-                let pixel = self.get_pixel(x, y).data;
+                let pixel = self.get_pixel(x, y).0;
 
                 // Convert pixel to Color
                 let raw = Color::from_u8(pixel[0], pixel[1], pixel[2]);
@@ -72,7 +72,7 @@ impl BlitExt for RgbImage {
             }
         }
 
-        BlitBuffer { 
+        BlitBuffer {
             width: width as i32,
             height: height as i32,
             data
@@ -93,7 +93,7 @@ impl BlitExt for RgbImage {
 
         for y in min_y..max_y {
             for x in min_x..max_x {
-                let pixel = self.get_pixel(x as u32, y as u32).data;
+                let pixel = self.get_pixel(x as u32, y as u32).0;
 
                 // Convert pixel to Color
                 let raw = Color::from_u8(pixel[0], pixel[1], pixel[2]);
@@ -123,7 +123,7 @@ impl BlitExt for RgbaImage {
         let mut index = 0;
         for y in 0..height {
             for x in 0..width {
-                let pixel = self.get_pixel(x, y).data;
+                let pixel = self.get_pixel(x, y).0;
 
                 // Convert pixel to Color
                 let raw = Color::from_u8(pixel[0], pixel[1], pixel[2]);
@@ -138,7 +138,7 @@ impl BlitExt for RgbaImage {
             }
         }
 
-        BlitBuffer { 
+        BlitBuffer {
             width: width as i32,
             height: height as i32,
             data
@@ -159,7 +159,7 @@ impl BlitExt for RgbaImage {
 
         for y in min_y..max_y {
             for x in min_x..max_x {
-                let pixel = self.get_pixel(x as u32, y as u32).data;
+                let pixel = self.get_pixel(x as u32, y as u32).0;
 
                 // Convert pixel to Color
                 let raw = Color::from_u8(pixel[0], pixel[1], pixel[2]);

@@ -222,7 +222,7 @@ impl BlitBuffer {
 
     /// Saves the buffer to a file at the path specified.
     /// A custom binary format is used for this.
-    pub fn save<P>(&self, path: P) -> Result<(), Box<Error>> where P: AsRef<Path> {
+    pub fn save<P>(&self, path: P) -> Result<(), Box<dyn Error>> where P: AsRef<Path> {
         let mut file = File::create(path)?;
         {
             let mut writer = BufWriter::new(&mut file);
@@ -235,7 +235,7 @@ impl BlitBuffer {
 
     /// Create a new buffer from a file at the path specified.
     /// The file needs to be the custom binary format.
-    pub fn open<P>(path: P) -> Result<Self, Box<Error>> where P: AsRef<Path> {
+    pub fn open<P>(path: P) -> Result<Self, Box<dyn Error>> where P: AsRef<Path> {
         let mut file = File::open(path)?;
 
         let mut data = Vec::new();
@@ -246,7 +246,7 @@ impl BlitBuffer {
 
     /// Create a new buffer from a file at the path specified.
     /// The array needs to be the custom binary format.
-    pub fn from_memory(buffer: &[u8]) -> Result<Self, Box<Error>> {
+    pub fn from_memory(buffer: &[u8]) -> Result<Self, Box<dyn Error>> {
         let buffer = deserialize(buffer)?;
 
         Ok(buffer)
