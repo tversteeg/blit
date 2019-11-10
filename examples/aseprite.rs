@@ -1,9 +1,9 @@
+#[cfg(all(feature = "aseprite", feature = "image"))]
+extern crate aseprite;
 extern crate blit;
+extern crate image;
 extern crate minifb;
 extern crate serde_json;
-extern crate image;
-#[cfg(all(feature="aseprite", feature="image"))]
-extern crate aseprite;
 
 use blit::*;
 use minifb::*;
@@ -15,7 +15,7 @@ const HEIGHT: usize = 120;
 
 const MASK_COLOR: u32 = 0xFF00FF;
 
-#[cfg(all(feature="aseprite", feature="image"))]
+#[cfg(all(feature = "aseprite", feature = "image"))]
 fn main() {
     let mut buffer: Vec<u32> = vec![0x00FFFFFF; WIDTH * HEIGHT];
 
@@ -23,7 +23,13 @@ fn main() {
         scale: Scale::X2,
         ..WindowOptions::default()
     };
-    let mut window = Window::new("Blit Animation Example - ESC to exit", WIDTH, HEIGHT, options).expect("Unable to open window");
+    let mut window = Window::new(
+        "Blit Animation Example - ESC to exit",
+        WIDTH,
+        HEIGHT,
+        options,
+    )
+    .expect("Unable to open window");
 
     // Open the spritesheet image
     let img = image::open("examples/king-by-buch.png").unwrap();
@@ -53,20 +59,38 @@ fn main() {
         }
 
         // Update the animations to go to the correct frame
-        walk_anim.update(&anim_buffer, time.elapsed().unwrap()).unwrap();
-        jump_anim.update(&anim_buffer, time.elapsed().unwrap()).unwrap();
-        run_anim.update(&anim_buffer, time.elapsed().unwrap()).unwrap();
-        full_anim.update(&anim_buffer, time.elapsed().unwrap()).unwrap();
+        walk_anim
+            .update(&anim_buffer, time.elapsed().unwrap())
+            .unwrap();
+        jump_anim
+            .update(&anim_buffer, time.elapsed().unwrap())
+            .unwrap();
+        run_anim
+            .update(&anim_buffer, time.elapsed().unwrap())
+            .unwrap();
+        full_anim
+            .update(&anim_buffer, time.elapsed().unwrap())
+            .unwrap();
 
         // Render the frames
-        anim_buffer.blit(&mut buffer, WIDTH, (4, 4), &walk_anim).unwrap();
-        anim_buffer.blit(&mut buffer, WIDTH, (36, 4), &jump_anim).unwrap();
-        anim_buffer.blit(&mut buffer, WIDTH, (68, 4), &run_anim).unwrap();
-        anim_buffer.blit(&mut buffer, WIDTH, (4, 68), &full_anim).unwrap();
+        anim_buffer
+            .blit(&mut buffer, WIDTH, (4, 4), &walk_anim)
+            .unwrap();
+        anim_buffer
+            .blit(&mut buffer, WIDTH, (36, 4), &jump_anim)
+            .unwrap();
+        anim_buffer
+            .blit(&mut buffer, WIDTH, (68, 4), &run_anim)
+            .unwrap();
+        anim_buffer
+            .blit(&mut buffer, WIDTH, (4, 68), &full_anim)
+            .unwrap();
 
         // Draw all the frames separately
         for i in 0..11 {
-            anim_buffer.blit_frame(&mut buffer, WIDTH, (32 * i + 4, 36), i as usize).unwrap();
+            anim_buffer
+                .blit_frame(&mut buffer, WIDTH, (32 * i + 4, 36), i as usize)
+                .unwrap();
         }
 
         window.update_with_buffer(&buffer).unwrap();
@@ -75,7 +99,7 @@ fn main() {
     }
 }
 
-#[cfg(not(all(feature="aseprite", feature="image")))]
+#[cfg(not(all(feature = "aseprite", feature = "image")))]
 fn main() {
     // Ignore this example when not using image
 }

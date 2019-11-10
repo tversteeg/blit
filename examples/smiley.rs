@@ -1,17 +1,17 @@
 extern crate blit;
-extern crate minifb;
 extern crate image;
+extern crate minifb;
 
 use blit::*;
-use minifb::*;
 use image::GenericImageView;
+use minifb::*;
 
 const WIDTH: usize = 250;
 const HEIGHT: usize = 250;
 
 const MASK_COLOR: u32 = 0xFF00FF;
 
-#[cfg(feature="image")]
+#[cfg(feature = "image")]
 fn main() {
     let mut buffer: Vec<u32> = vec![0x00FFFFFF; WIDTH * HEIGHT];
 
@@ -19,14 +19,25 @@ fn main() {
         scale: Scale::X2,
         ..WindowOptions::default()
     };
-    let mut window = Window::new("Blit Example - ESC to exit & click to draw", WIDTH, HEIGHT, options).expect("Unable to open window");
+    let mut window = Window::new(
+        "Blit Example - ESC to exit & click to draw",
+        WIDTH,
+        HEIGHT,
+        options,
+    )
+    .expect("Unable to open window");
 
     let img = image::open("examples/smiley_rgba.png").unwrap();
     println!("Loaded RGBA image with size {:?}", img.dimensions());
     let img_size = img.dimensions();
 
     let rgb = img.as_rgba8().unwrap();
-    rgb.blit(&mut buffer, WIDTH, (img_size.0 as i32, 0), Color::from_u32(MASK_COLOR));
+    rgb.blit(
+        &mut buffer,
+        WIDTH,
+        (img_size.0 as i32, 0),
+        Color::from_u32(MASK_COLOR),
+    );
 
     let img = image::open("examples/smiley_rgb.png").unwrap();
     println!("Loaded RGB image with size {:?}", img.dimensions());
@@ -49,16 +60,20 @@ fn main() {
     let half_size = (blit_size.0 / 2, blit_size.1 / 2);
 
     // Draw the left half
-    blit_buf.blit_rect(&mut buffer,
-                       WIDTH,
-                       (0, blit_size.1),
-                       (0, 0, half_size.0, blit_size.1));
+    blit_buf.blit_rect(
+        &mut buffer,
+        WIDTH,
+        (0, blit_size.1),
+        (0, 0, half_size.0, blit_size.1),
+    );
 
     // Draw the bottom right part
-    blit_buf.blit_rect(&mut buffer,
-                       WIDTH,
-                       (half_size.0, (blit_size.1 + half_size.1)),
-                       (half_size.0, half_size.1, half_size.0, half_size.1));
+    blit_buf.blit_rect(
+        &mut buffer,
+        WIDTH,
+        (half_size.0, (blit_size.1 + half_size.1)),
+        (half_size.0, half_size.1, half_size.0, half_size.1),
+    );
 
     let mut draw_countdown = 0;
     while window.is_open() && !window.is_key_down(Key::Escape) {
@@ -78,7 +93,7 @@ fn main() {
     }
 }
 
-#[cfg(not(feature="image"))]
+#[cfg(not(feature = "image"))]
 fn main() {
     // Ignore this example when not using image
 }

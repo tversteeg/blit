@@ -51,24 +51,33 @@
 
 extern crate bincode;
 extern crate rayon;
-#[macro_use] extern crate serde_derive;
-#[macro_use] extern crate quick_error;
-#[cfg(feature="image")] extern crate image;
-#[cfg(feature="image")] extern crate num_traits;
-#[cfg(feature="aseprite")] extern crate aseprite;
+#[macro_use]
+extern crate serde_derive;
+#[macro_use]
+extern crate quick_error;
+#[cfg(feature = "aseprite")]
+extern crate aseprite;
+#[cfg(feature = "image")]
+extern crate image;
+#[cfg(feature = "image")]
+extern crate num_traits;
 
-use std::cmp;
-use std::io::{BufWriter, Read};
-use std::fs::File;
-use std::path::Path;
-use std::error::Error;
-use bincode::{serialize_into, deserialize};
+use bincode::{deserialize, serialize_into};
 use rayon::prelude::*;
+use std::cmp;
+use std::error::Error;
+use std::fs::File;
+use std::io::{BufWriter, Read};
+use std::path::Path;
 
-#[cfg(feature="image")] pub mod image_feature;
-#[cfg(feature="image")] pub use image_feature::*;
-#[cfg(feature="aseprite")] pub mod aseprite_feature;
-#[cfg(feature="aseprite")] pub use aseprite_feature::*;
+#[cfg(feature = "image")]
+pub mod image_feature;
+#[cfg(feature = "image")]
+pub use image_feature::*;
+#[cfg(feature = "aseprite")]
+pub mod aseprite_feature;
+#[cfg(feature = "aseprite")]
+pub use aseprite_feature::*;
 
 /// A trait so that both `Color` and `u32` can do blitting operations.
 trait BlittablePrimitive {
@@ -122,7 +131,7 @@ pub struct BlitBuffer {
     height: i32,
 
     // The first field of the tuple is the color, the second the mask
-    data: Vec<(Color, Color)>
+    data: Vec<(Color, Color)>,
 }
 
 impl BlitBuffer {
@@ -135,17 +144,20 @@ impl BlitBuffer {
         if offset == (0, 0) && dst_size == src_size {
             // If the sizes match and the buffers are aligned we don't have to do any special
             // bounds checks
-            dst.par_iter_mut().zip(&self.data[..]).for_each(|(pixel, &(color, mask))| {
-                pixel.blit(color.u32(), mask.u32());
-            });
+            dst.par_iter_mut()
+                .zip(&self.data[..])
+                .for_each(|(pixel, &(color, mask))| {
+                    pixel.blit(color.u32(), mask.u32());
+                });
 
             return;
         }
 
-        let dst_start = (cmp::max(offset.0, 0),
-                         cmp::max(offset.1, 0));
-        let dst_end = (cmp::min(offset.0 + src_size.0, dst_size.0),
-                       cmp::min(offset.1 + src_size.1, dst_size.1));
+        let dst_start = (cmp::max(offset.0, 0), cmp::max(offset.1, 0));
+        let dst_end = (
+            cmp::min(offset.0 + src_size.0, dst_size.0),
+            cmp::min(offset.1 + src_size.1, dst_size.1),
+        );
 
         for dst_y in dst_start.1..dst_end.1 {
             let src_y = dst_y - offset.1;
@@ -168,15 +180,22 @@ impl BlitBuffer {
     }
 
     /// Blit a section of the image on a buffer.
-    pub fn blit_rect(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), sub_rect: (i32, i32, i32, i32)) {
+    pub fn blit_rect(
+        &self,
+        dst: &mut [u32],
+        dst_width: usize,
+        offset: (i32, i32),
+        sub_rect: (i32, i32, i32, i32),
+    ) {
         let dst_size = (dst_width as i32, (dst.len() / dst_width) as i32);
 
         let src_size = (self.width, self.height);
 
-        let dst_start = (cmp::max(offset.0, 0),
-                         cmp::max(offset.1, 0));
-        let dst_end = (cmp::min(offset.0 + sub_rect.2, dst_size.0),
-                       cmp::min(offset.1 + sub_rect.3, dst_size.1));
+        let dst_start = (cmp::max(offset.0, 0), cmp::max(offset.1, 0));
+        let dst_end = (
+            cmp::min(offset.0 + sub_rect.2, dst_size.0),
+            cmp::min(offset.1 + sub_rect.3, dst_size.1),
+        );
 
         for dst_y in dst_start.1..dst_end.1 {
             let src_y = dst_y - offset.1 + sub_rect.1;
@@ -217,12 +236,19 @@ impl BlitBuffer {
             }
         }
 
-        BlitBuffer { width, height, data }
+        BlitBuffer {
+            width,
+            height,
+            data,
+        }
     }
 
     /// Saves the buffer to a file at the path specified.
     /// A custom binary format is used for this.
-    pub fn save<P>(&self, path: P) -> Result<(), Box<dyn Error>> where P: AsRef<Path> {
+    pub fn save<P>(&self, path: P) -> Result<(), Box<dyn Error>>
+    where
+        P: AsRef<Path>,
+    {
         let mut file = File::create(path)?;
         {
             let mut writer = BufWriter::new(&mut file);
@@ -235,7 +261,10 @@ impl BlitBuffer {
 
     /// Create a new buffer from a file at the path specified.
     /// The file needs to be the custom binary format.
-    pub fn open<P>(path: P) -> Result<Self, Box<dyn Error>> where P: AsRef<Path> {
+    pub fn open<P>(path: P) -> Result<Self, Box<dyn Error>>
+    where
+        P: AsRef<Path>,
+    {
         let mut file = File::open(path)?;
 
         let mut data = Vec::new();

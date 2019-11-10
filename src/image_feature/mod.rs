@@ -9,7 +9,7 @@ pub fn blit_buffer<I, P, S>(image: &I, mask_color: Color) -> BlitBuffer
 where
     I: GenericImage<Pixel = P>,
     P: Pixel<Subpixel = S> + 'static,
-    S: Primitive + 'static
+    S: Primitive + 'static,
 {
     let (width, height) = image.dimensions();
 
@@ -24,7 +24,7 @@ where
                 NumCast::from(p.0).unwrap(),
                 NumCast::from(p.1).unwrap(),
                 NumCast::from(p.2).unwrap(),
-                NumCast::from(p.3).unwrap()
+                NumCast::from(p.3).unwrap(),
             );
 
             // Convert pixel to Color
@@ -43,7 +43,7 @@ where
     BlitBuffer {
         width: width as i32,
         height: height as i32,
-        data
+        data,
     }
 }
 
@@ -75,7 +75,7 @@ impl BlitExt for RgbImage {
         BlitBuffer {
             width: width as i32,
             height: height as i32,
-            data
+            data,
         }
     }
 
@@ -141,7 +141,7 @@ impl BlitExt for RgbaImage {
         BlitBuffer {
             width: width as i32,
             height: height as i32,
-            data
+            data,
         }
     }
 
