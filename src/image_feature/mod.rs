@@ -31,7 +31,7 @@ where
             let raw = Color::from_u8(pixel.0, pixel.1, pixel.2);
 
             if raw == mask_color || pixel.3 < RGBA_ALPHA_TRESHOLD {
-                data[index].1 = Color::from_u32(0xFFFFFF);
+                data[index].1 = Color::from_u32(0xFF_FF_FF);
             } else {
                 data[index].0 = raw;
             }
@@ -63,7 +63,7 @@ impl BlitExt for RgbImage {
                 let raw = Color::from_u8(pixel[0], pixel[1], pixel[2]);
 
                 if raw == mask_color {
-                    data[index].1 = Color::from_u32(0xFFFFFF);
+                    data[index].1 = Color::from_u32(0xFF_FF_FF);
                 } else {
                     data[index].0 = raw;
                 }
@@ -129,7 +129,7 @@ impl BlitExt for RgbaImage {
                 let raw = Color::from_u8(pixel[0], pixel[1], pixel[2]);
 
                 if raw == mask_color || pixel[3] < RGBA_ALPHA_TRESHOLD {
-                    data[index].1 = Color::from_u32(0xFFFFFF);
+                    data[index].1 = Color::from_u32(0xFF_FF_FF);
                 } else {
                     data[index].0 = raw;
                 }

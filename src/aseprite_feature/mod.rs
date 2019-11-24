@@ -68,7 +68,7 @@ impl Animation {
             }
         }
 
-        return Err(AnimationError::NoMatchingTag);
+        Err(AnimationError::NoMatchingTag)
     }
 
     /// Update the animation with the time and set the current frame to the correct one.
@@ -113,7 +113,7 @@ impl Animation {
             return Ok(AnimationStatus::Repeat);
         }
 
-        return Ok(AnimationStatus::Playing);
+        Ok(AnimationStatus::Playing)
     }
 }
 

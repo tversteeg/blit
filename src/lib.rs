@@ -98,12 +98,12 @@ pub struct Color(u32);
 impl Color {
     /// Create a color from a 32 bits unsigned int, discard the alpha (last 8 bits).
     pub fn from_u32(color: u32) -> Self {
-        Color(color | 0xFF000000)
+        Color(color | 0xFF_00_00_00)
     }
 
     /// Create a color from 3 8 bits unsigned ints and pack them into a 32 bit unsigned int.
     pub fn from_u8(red: u8, green: u8, blue: u8) -> Self {
-        Color(0xFF000000 | (u32::from(red) << 16) | (u32::from(green) << 8) | u32::from(blue))
+        Color(0xFF_00_00_00 | (u32::from(red) << 16) | (u32::from(green) << 8) | u32::from(blue))
     }
 
     /// Return the wrapped `u32` object.
@@ -229,7 +229,7 @@ impl BlitBuffer {
 
             if pixel == mask_color {
                 // Set the mask
-                data[index].1 = Color::from_u32(0xFFFFFF);
+                data[index].1 = Color::from_u32(0xFF_FF_FF);
             } else {
                 // Set the color
                 data[index].0 = pixel;
