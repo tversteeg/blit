@@ -89,7 +89,7 @@ fn main() {
 
         draw_countdown -= 1;
 
-        window.update_with_buffer(&buffer).unwrap();
+        window.update_with_buffer(&buffer, WIDTH, HEIGHT).unwrap();
     }
 }
 

@@ -93,7 +93,7 @@ fn main() {
                 .unwrap();
         }
 
-        window.update_with_buffer(&buffer).unwrap();
+        window.update_with_buffer(&buffer, WIDTH, HEIGHT).unwrap();
 
         time = SystemTime::now();
     }

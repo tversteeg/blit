@@ -22,9 +22,9 @@ default = ["image", "aseprite"]
 
 [dependencies]
 rayon = "1.2.1"
-bincode = "1.2.0"
-serde = "1.0.102"
-serde_derive = "1.0.102"
+bincode = "1.2.1"
+serde = "1.0.104"
+serde_derive = "1.0.104"
 quick-error = "1.2.2"
 num-traits = "0.2.10"
 image = { version = "0.22.3", optional = true }
@@ -40,5 +40,5 @@ path = "examples/aseprite.rs"
 
 [dev-dependencies]
 image = "0.22.3"
-minifb = "0.14.0"
-serde_json = "1.0.41"
+minifb = "0.15.0"
+serde_json = "1.0.44"
