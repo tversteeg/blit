@@ -47,7 +47,7 @@ fn main() {
     rgb.blit(&mut buffer, WIDTH, (0, 0), Color::from_u32(0xFFFFFF));
 
     // Convert the image to a specific blit buffer type which is a lot faster
-    let blit_buf = rgb.to_blit_buffer(Color::from_u32(MASK_COLOR));
+    let _blit_buf = rgb.to_blit_buffer(MASK_COLOR);
 
     // It's not necessarily to use the `as_rgb*` for this
     let blit_buf = blit_buffer(&img, Color::from_u32(MASK_COLOR));

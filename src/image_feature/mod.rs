@@ -5,12 +5,15 @@ use num_traits::NumCast;
 const RGBA_ALPHA_TRESHOLD: u8 = 127;
 
 /// Create a `BlitBuffer` type from a generic image type so a `as_rgb*` step is not needed.
-pub fn blit_buffer<I, P, S>(image: &I, mask_color: Color) -> BlitBuffer
+pub fn blit_buffer<I, P, S, C>(image: &I, mask_color: C) -> BlitBuffer
 where
     I: GenericImage<Pixel = P>,
     P: Pixel<Subpixel = S> + 'static,
     S: Primitive + 'static,
+    C: Into<Color>,
 {
+    let mask_color = mask_color.into();
+
     let (width, height) = image.dimensions();
 
     let pixels = (width * height) as usize;
@@ -44,11 +47,17 @@ where
         width: width as i32,
         height: height as i32,
         data,
+        mask_color,
     }
 }
 
 impl BlitExt for RgbImage {
-    fn to_blit_buffer(&self, mask_color: Color) -> BlitBuffer {
+    fn to_blit_buffer<C>(&self, mask_color: C) -> BlitBuffer
+    where
+        C: Into<Color>,
+    {
+        let mask_color = mask_color.into();
+
         let (width, height) = self.dimensions();
 
         let pixels = (width * height) as usize;
@@ -76,10 +85,16 @@ impl BlitExt for RgbImage {
             width: width as i32,
             height: height as i32,
             data,
+            mask_color,
         }
     }
 
-    fn blit(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), mask_color: Color) {
+    fn blit<C>(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), mask_color: C)
+    where
+        C: Into<Color>,
+    {
+        let mask_color = mask_color.into();
+
         let dst_size = (dst_width as i32, (dst.len() / dst_width) as i32);
 
         let (width, height) = self.dimensions();
@@ -114,7 +129,12 @@ impl BlitExt for RgbImage {
 }
 
 impl BlitExt for RgbaImage {
-    fn to_blit_buffer(&self, mask_color: Color) -> BlitBuffer {
+    fn to_blit_buffer<C>(&self, mask_color: C) -> BlitBuffer
+    where
+        C: Into<Color>,
+    {
+        let mask_color = mask_color.into();
+
         let (width, height) = self.dimensions();
 
         let pixels = (width * height) as usize;
@@ -142,10 +162,16 @@ impl BlitExt for RgbaImage {
             width: width as i32,
             height: height as i32,
             data,
+            mask_color,
         }
     }
 
-    fn blit(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), mask_color: Color) {
+    fn blit<C>(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), mask_color: C)
+    where
+        C: Into<Color>,
+    {
+        let mask_color = mask_color.into();
+
         let dst_size = (dst_width as i32, (dst.len() / dst_width) as i32);
 
         let (width, height) = self.dimensions();

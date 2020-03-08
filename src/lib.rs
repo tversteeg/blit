@@ -124,6 +124,12 @@ impl BlittablePrimitive for u32 {
     }
 }
 
+impl From<u32> for Color {
+    fn from(raw: u32) -> Self {
+        Self(raw)
+    }
+}
+
 /// A data structure holding a color and a mask buffer to make blitting on a buffer real fast.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BlitBuffer {
@@ -132,6 +138,8 @@ pub struct BlitBuffer {
 
     // The first field of the tuple is the color, the second the mask
     data: Vec<(Color, Color)>,
+
+    mask_color: Color,
 }
 
 impl BlitBuffer {
@@ -218,7 +226,12 @@ impl BlitBuffer {
     }
 
     /// Create a instance from a buffer of `Color` data.
-    pub fn from_buffer(src: &[u32], width: i32, mask_color: Color) -> Self {
+    pub fn from_buffer<C>(src: &[u32], width: i32, mask_color: C) -> Self
+    where
+        C: Into<Color>,
+    {
+        let mask_color = mask_color.into();
+
         let height = src.len() as i32 / width;
 
         let pixels = (width * height) as usize;
@@ -240,6 +253,7 @@ impl BlitBuffer {
             width,
             height,
             data,
+            mask_color,
         }
     }
 
@@ -286,6 +300,21 @@ impl BlitBuffer {
         (self.width, self.height)
     }
 
+    /// Get the width of the buffer in pixels.
+    pub fn width(&self) -> i32 {
+        self.width
+    }
+
+    /// Get the height of the buffer in pixels.
+    pub fn height(&self) -> i32 {
+        self.height
+    }
+
+    /// Get the color of the mask.
+    pub fn mask_color(&self) -> Color {
+        self.mask_color
+    }
+
     /// Get the raw pixels buffer, this is a costly operation.
     pub fn to_raw_buffer(&self) -> Vec<u32> {
         self.data
@@ -299,8 +328,12 @@ impl BlitBuffer {
 pub trait BlitExt {
     /// Convert the image to a custom `BlitBuffer` type which is optimized for applying the
     /// blitting operations.
-    fn to_blit_buffer(&self, mask_color: Color) -> BlitBuffer;
+    fn to_blit_buffer<C>(&self, mask_color: C) -> BlitBuffer
+    where
+        C: Into<Color>;
 
     /// Blit the image directly on a buffer.
-    fn blit(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), mask_color: Color);
+    fn blit<C>(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), mask_color: C)
+    where
+        C: Into<Color>;
 }
