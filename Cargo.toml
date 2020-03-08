@@ -1,6 +1,6 @@
 [package]
 name = "blit"
-version = "0.5.11-alpha.0"
+version = "0.5.11"
 edition = "2018"
 authors = ["Thomas Versteeg <thomasversteeg@gmx.com>"]
 license = "GPL-3.0"
