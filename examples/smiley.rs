@@ -32,25 +32,20 @@ fn main() {
     let img_size = img.dimensions();
 
     let rgb = img.as_rgba8().unwrap();
-    rgb.blit(
-        &mut buffer,
-        WIDTH,
-        (img_size.0 as i32, 0),
-        Color::from_u32(MASK_COLOR),
-    );
+    rgb.blit(&mut buffer, WIDTH, (img_size.0 as i32, 0), MASK_COLOR);
 
     let img = image::open("examples/smiley_rgb.png").unwrap();
     println!("Loaded RGB image with size {:?}", img.dimensions());
     let img_size = img.dimensions();
 
     let rgb = img.as_rgb8().unwrap();
-    rgb.blit(&mut buffer, WIDTH, (0, 0), Color::from_u32(0xFFFFFF));
+    rgb.blit(&mut buffer, WIDTH, (0, 0), 0xFFFFFF);
 
     // Convert the image to a specific blit buffer type which is a lot faster
     let _blit_buf = rgb.to_blit_buffer(MASK_COLOR);
 
     // It's not necessarily to use the `as_rgb*` for this
-    let blit_buf = blit_buffer(&img, Color::from_u32(MASK_COLOR));
+    let blit_buf = blit_buffer(&img, MASK_COLOR);
 
     // Save the buffer to disk and load it again
     blit_buf.save("smiley.blit").unwrap();

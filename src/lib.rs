@@ -126,7 +126,7 @@ impl BlittablePrimitive for u32 {
 
 impl From<u32> for Color {
     fn from(raw: u32) -> Self {
-        Self(raw)
+        Self::from_u32(raw)
     }
 }
 
