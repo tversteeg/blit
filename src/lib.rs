@@ -285,6 +285,14 @@ impl BlitBuffer {
     pub fn size(&self) -> (i32, i32) {
         (self.width, self.height)
     }
+
+    /// Get the raw pixels buffer, this is a costly operation.
+    pub fn to_raw_buffer(&self) -> Vec<u32> {
+        self.data
+            .iter()
+            .map(|(color, _mask)| color.0)
+            .collect::<_>()
+    }
 }
 
 /// A trait adding blitting functions to image types.
