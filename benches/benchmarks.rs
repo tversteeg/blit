@@ -37,7 +37,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         let mut buffer: Vec<u32> = vec![0; (size.0 * size.1) as usize];
 
         b.iter(|| {
-            blit.blit(&mut buffer, SIZE, (0, 0));
+            blit.blit(&mut buffer, size.0 as usize, (0, 0));
         });
     });
 

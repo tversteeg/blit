@@ -50,7 +50,6 @@
 //! ```
 
 extern crate bincode;
-extern crate rayon;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
@@ -63,12 +62,14 @@ extern crate image;
 extern crate num_traits;
 
 use bincode::{deserialize, serialize_into};
-use rayon::prelude::*;
-use std::cmp;
-use std::error::Error;
-use std::fs::File;
-use std::io::{BufWriter, Read};
-use std::path::Path;
+use std::{
+    cmp,
+    error::Error,
+    fmt,
+    fs::File,
+    io::{BufWriter, Read},
+    path::Path,
+};
 
 #[cfg(feature = "image")]
 pub mod image_feature;
@@ -92,7 +93,7 @@ trait BlittablePrimitive {
 /// 0x00FF0000: red
 /// 0x0000FF00: green
 /// 0x000000FF: blue
-#[derive(Serialize, Deserialize, Debug, Copy, Clone, Eq, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Default)]
 pub struct Color(u32);
 
 impl Color {
@@ -114,19 +115,25 @@ impl Color {
 
 impl BlittablePrimitive for Color {
     fn blit(&mut self, color: Self, mask: Self) {
-        self.0 = self.0 & mask.0 | color.0;
-    }
-}
-
-impl BlittablePrimitive for u32 {
-    fn blit(&mut self, color: Self, mask: Self) {
-        *self = *self & mask | color;
+        self.0.blit(mask.0, color.0);
     }
 }
 
 impl From<u32> for Color {
     fn from(raw: u32) -> Self {
         Self::from_u32(raw)
+    }
+}
+
+impl fmt::Debug for Color {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&format!("{:x?}", self.0))
+    }
+}
+
+impl BlittablePrimitive for u32 {
+    fn blit(&mut self, color: Self, mask: Self) {
+        *self = *self & mask | color;
     }
 }
 
@@ -152,10 +159,10 @@ impl BlitBuffer {
         if offset == (0, 0) && dst_size == src_size {
             // If the sizes match and the buffers are aligned we don't have to do any special
             // bounds checks
-            dst.par_iter_mut()
+            dst.iter_mut()
                 .zip(&self.data[..])
-                .for_each(|(pixel, &(color, mask))| {
-                    pixel.blit(color.u32(), mask.u32());
+                .for_each(|(pixel, color)| {
+                    pixel.blit(color.0.u32(), color.1.u32());
                 });
 
             return;
@@ -336,4 +343,31 @@ pub trait BlitExt {
     fn blit<C>(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), mask_color: C)
     where
         C: Into<Color>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exact_fit() {
+        let mut buffer = [0xFF, 0xFF00, 0xFF0000, 0xFF, 0xFF00, 0xFF0000];
+
+        // The last number should be masked
+        let blit = BlitBuffer::from_buffer(&[0xAA, 0xAA00, 0xAA0000, 0xBB, 0xBB, 0xBB], 2, 0xBB);
+        blit.blit(&mut buffer, 2, (0, 0));
+
+        // Create a copy but cast the u32 to a i32
+        assert_eq!(
+            buffer,
+            [
+                0xAA | 0xFF000000,
+                0xAA00 | 0xFF000000,
+                0xAA0000 | 0xFF000000,
+                0xFF | 0xFF000000,
+                0xFF00 | 0xFF000000,
+                0xFF0000 | 0xFF000000,
+            ]
+        );
+    }
 }
