@@ -9,11 +9,11 @@ use minifb::*;
 const WIDTH: usize = 250;
 const HEIGHT: usize = 250;
 
-const MASK_COLOR: u32 = 0xFF00FF;
+const MASK_COLOR: u32 = 0xFF_00_FF;
 
 #[cfg(feature = "image")]
 fn main() {
-    let mut buffer: Vec<u32> = vec![0x00FFFFFF; WIDTH * HEIGHT];
+    let mut buffer: Vec<u32> = vec![0x00_FF_FF_FF; WIDTH * HEIGHT];
 
     let options = WindowOptions {
         scale: Scale::X2,
@@ -39,7 +39,7 @@ fn main() {
     let img_size = img.dimensions();
 
     let rgb = img.as_rgb8().unwrap();
-    rgb.blit(&mut buffer, WIDTH, (0, 0), 0xFFFFFF);
+    rgb.blit(&mut buffer, WIDTH, (0, 0), 0xFF_FF_FF);
 
     // Convert the image to a specific blit buffer type which is a lot faster
     let _blit_buf = rgb.to_blit_buffer(MASK_COLOR);
@@ -72,7 +72,7 @@ fn main() {
 
     let mut draw_countdown = 0;
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        window.get_mouse_pos(MouseMode::Discard).map(|mouse| {
+        if let Some(mouse) = window.get_mouse_pos(MouseMode::Discard) {
             if draw_countdown <= 0 && window.get_mouse_down(MouseButton::Left) {
                 let x_pos = mouse.0 as i32 - (img_size.0 / 2) as i32;
                 let y_pos = mouse.1 as i32 - (img_size.1 / 2) as i32;
@@ -80,7 +80,7 @@ fn main() {
 
                 draw_countdown = 10;
             }
-        });
+        }
 
         draw_countdown -= 1;
 

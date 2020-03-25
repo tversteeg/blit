@@ -13,11 +13,11 @@ use std::time::SystemTime;
 const WIDTH: usize = 512;
 const HEIGHT: usize = 120;
 
-const MASK_COLOR: u32 = 0xFF00FF;
+const MASK_COLOR: u32 = 0xFF_00_FF;
 
 #[cfg(all(feature = "aseprite", feature = "image"))]
 fn main() {
-    let mut buffer: Vec<u32> = vec![0x00FFFFFF; WIDTH * HEIGHT];
+    let mut buffer: Vec<u32> = vec![0x00_FF_FF_FF; WIDTH * HEIGHT];
 
     let options = WindowOptions {
         scale: Scale::X2,
@@ -55,7 +55,7 @@ fn main() {
     let mut time = SystemTime::now();
     while window.is_open() && !window.is_key_down(Key::Escape) {
         for i in buffer.iter_mut() {
-            *i = 0x00FFFFFF;
+            *i = 0x00_FF_FF_FF;
         }
 
         // Update the animations to go to the correct frame

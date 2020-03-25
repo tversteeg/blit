@@ -25,9 +25,9 @@
 //!
 //! const WIDTH: usize = 180;
 //! const HEIGHT: usize = 180;
-//! const MASK_COLOR: u32 = 0xFF00FF;
+//! const MASK_COLOR: u32 = 0xFF_00_FF;
 //!
-//! let mut buffer: Vec<u32> = vec![0xFFFFFFFF; WIDTH * HEIGHT];
+//! let mut buffer: Vec<u32> = vec![0xFF_FF_FF_FF; WIDTH * HEIGHT];
 //!
 //! let img = image::open("examples/smiley.png").unwrap();
 //! let img_rgb = img.as_rgb8().unwrap();
@@ -89,10 +89,10 @@ trait BlittablePrimitive {
 /// A newtype representing the color in a buffer.
 ///
 /// It is divided into alpha (not used), red, green & blue:
-/// 0xFF000000: alpha (not used)
-/// 0x00FF0000: red
-/// 0x0000FF00: green
-/// 0x000000FF: blue
+/// 0xFF_00_00_00: alpha (not used)
+/// 0x00_FF_00_00: red
+/// 0x00_00_FF_00: green
+/// 0x00_00_00_FF: blue
 #[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Default)]
 pub struct Color(u32);
 
@@ -108,7 +108,7 @@ impl Color {
     }
 
     /// Return the wrapped `u32` object.
-    pub fn u32(&self) -> u32 {
+    pub fn u32(self) -> u32 {
         self.0
     }
 }
@@ -351,22 +351,22 @@ mod tests {
 
     #[test]
     fn exact_fit() {
-        let mut buffer = [0xFF, 0xFF00, 0xFF0000, 0xFF, 0xFF00, 0xFF0000];
+        let mut buffer = [0xFF, 0xFF_00, 0xFF_00_00, 0xFF, 0xFF_00, 0xFF_00_00];
 
         // The last number should be masked
-        let blit = BlitBuffer::from_buffer(&[0xAA, 0xAA00, 0xAA0000, 0xBB, 0xBB, 0xBB], 2, 0xBB);
+        let blit = BlitBuffer::from_buffer(&[0xAA, 0xAA_00, 0xAA_00_00, 0xBB, 0xBB, 0xBB], 2, 0xBB);
         blit.blit(&mut buffer, 2, (0, 0));
 
         // Create a copy but cast the u32 to a i32
         assert_eq!(
             buffer,
             [
-                0xAA | 0xFF000000,
-                0xAA00 | 0xFF000000,
-                0xAA0000 | 0xFF000000,
-                0xFF | 0xFF000000,
-                0xFF00 | 0xFF000000,
-                0xFF0000 | 0xFF000000,
+                0xAA | 0xFF_00_00_00,
+                0xAA_00 | 0xFF_00_00_00,
+                0xAA_00_00 | 0xFF_00_00_00,
+                0xFF | 0xFF_00_00_00,
+                0xFF_00 | 0xFF_00_00_00,
+                0xFF_00_00 | 0xFF_00_00_00,
             ]
         );
     }
