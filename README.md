@@ -1,7 +1,8 @@
 # blit
 A Rust library for blitting 2D sprites
 
-[![Build Status](https://travis-ci.org/tversteeg/blit.svg?branch=master)](https://travis-ci.org/tversteeg/blit) [![Cargo](https://img.shields.io/crates/v/blit.svg)](https://crates.io/crates/blit) [![License: GPL-3.0](https://img.shields.io/crates/l/blit.svg)](#license) [![Downloads](https://img.shields.io/crates/d/blit.svg)](#downloads)
+<a href="https://github.com/tversteeg/const-tweaker/actions"><img src="https://github.com/tversteeg/const-tweaker/workflows/CI/badge.svg" alt="CI"/></a>
+[![Cargo](https://img.shields.io/crates/v/blit.svg)](https://crates.io/crates/blit) [![License: GPL-3.0](https://img.shields.io/crates/l/blit.svg)](#license) [![Downloads](https://img.shields.io/crates/d/blit.svg)](#downloads)
 
 ### [Documentation](https://docs.rs/blit/)
 
