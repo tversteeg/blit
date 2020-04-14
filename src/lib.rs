@@ -133,6 +133,7 @@ impl fmt::Debug for Color {
 
 impl BlittablePrimitive for u32 {
     fn blit(&mut self, color: Self, mask: Self) {
+        // First draw the mask as black on the background using an AND operation, and then draw the colors using an OR operation
         *self = *self & mask | color;
     }
 }
