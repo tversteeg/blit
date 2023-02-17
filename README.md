@@ -12,13 +12,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-blit = "0.5"
-```
-
-And this to your crate root:
-
-```rust
-extern crate blit;
+blit = "0.6"
 ```
 
 ### Run the example
