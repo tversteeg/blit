@@ -7,45 +7,38 @@ const RGBA_ALPHA_TRESHOLD: u8 = 127;
 /// Create a `BlitBuffer` type from a generic image type so a `as_rgb*` step is not needed.
 pub fn blit_buffer<I, P, S, C>(image: &I, mask_color: C) -> BlitBuffer
 where
-    I: GenericImage<Pixel = P>,
+    I: GenericImageView<Pixel = P>,
     P: Pixel<Subpixel = S> + 'static,
     S: Primitive + 'static,
     C: Into<Color>,
 {
     let mask_color = mask_color.into();
-
-    let (width, height) = image.dimensions();
-
-    let pixels = (width * height) as usize;
-    let mut data: Vec<(Color, Color)> = vec![(Color::from_u32(0), Color::from_u32(0)); pixels];
-
-    let mut index = 0;
-    for y in 0..height {
-        for x in 0..width {
-            let p = image.get_pixel(x, y).channels4();
-            let pixel: (u8, u8, u8, u8) = (
-                NumCast::from(p.0).unwrap(),
-                NumCast::from(p.1).unwrap(),
-                NumCast::from(p.2).unwrap(),
-                NumCast::from(p.3).unwrap(),
-            );
+    let data = image
+        .pixels()
+        .map(|(_, _, p): (_, _, P)| {
+            let pixel = p.to_rgba();
 
             // Convert pixel to Color
-            let raw = Color::from_u8(pixel.0, pixel.1, pixel.2);
+            let raw = Color::from_u8(
+                NumCast::from(pixel[0]).unwrap(),
+                NumCast::from(pixel[1]).unwrap(),
+                NumCast::from(pixel[2]).unwrap(),
+            );
+            let raw_alpha: u8 = NumCast::from(pixel[3]).unwrap();
 
-            if raw == mask_color || pixel.3 < RGBA_ALPHA_TRESHOLD {
-                data[index].1 = Color::from_u32(0xFF_FF_FF);
+            if raw == mask_color || raw_alpha < RGBA_ALPHA_TRESHOLD {
+                // Empty mask
+                (Color::black(), Color::white())
             } else {
-                data[index].0 = raw;
+                // Filled with pixel value
+                (raw, Color::alpha())
             }
-
-            index += 1;
-        }
-    }
+        })
+        .collect();
 
     BlitBuffer {
-        width: width as i32,
-        height: height as i32,
+        width: image.width() as i32,
+        height: image.height() as i32,
         data,
         mask_color,
     }
@@ -72,7 +65,7 @@ impl BlitExt for RgbImage {
                 let raw = Color::from_u8(pixel[0], pixel[1], pixel[2]);
 
                 if raw == mask_color {
-                    data[index].1 = Color::from_u32(0xFF_FF_FF);
+                    data[index].1 = Color::white();
                 } else {
                     data[index].0 = raw;
                 }
@@ -134,33 +127,24 @@ impl BlitExt for RgbaImage {
         C: Into<Color>,
     {
         let mask_color = mask_color.into();
-
-        let (width, height) = self.dimensions();
-
-        let pixels = (width * height) as usize;
-        let mut data: Vec<(Color, Color)> = vec![(Color::from_u32(0), Color::from_u32(0)); pixels];
-
-        let mut index = 0;
-        for y in 0..height {
-            for x in 0..width {
-                let pixel = self.get_pixel(x, y).0;
-
+        let data = self
+            .pixels()
+            .map(|p: &Rgba<u8>| {
                 // Convert pixel to Color
-                let raw = Color::from_u8(pixel[0], pixel[1], pixel[2]);
-
-                if raw == mask_color || pixel[3] < RGBA_ALPHA_TRESHOLD {
-                    data[index].1 = Color::from_u32(0xFF_FF_FF);
+                let raw = Color::from_u8(p[0], p[1], p[2]);
+                if raw == mask_color || p[3] < RGBA_ALPHA_TRESHOLD {
+                    // Empty mask
+                    (Color::black(), Color::white())
                 } else {
-                    data[index].0 = raw;
+                    // Filled with pixel value
+                    (raw, Color::alpha())
                 }
-
-                index += 1;
-            }
-        }
+            })
+            .collect();
 
         BlitBuffer {
-            width: width as i32,
-            height: height as i32,
+            width: self.width() as i32,
+            height: self.height() as i32,
             data,
             mask_color,
         }

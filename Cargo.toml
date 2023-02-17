@@ -1,7 +1,7 @@
 [package]
 name = "blit"
 version = "0.5.13-alpha.0"
-edition = "2018"
+edition = "2021"
 authors = ["Thomas Versteeg <thomasversteeg@gmx.com>"]
 license = "GPL-3.0"
 homepage = "https://github.com/tversteeg/blit"
@@ -12,21 +12,26 @@ documentation = "https://docs.rs/blit"
 
 repository = "https://github.com/tversteeg/blit.git"
 keywords = ["image", "gamedev", "sprite", "blitting"]
-categories = ["games", "rendering::data-formats", "game-engines", "multimedia::images"]
+categories = [
+	"games",
+	"rendering::data-formats",
+	"game-engines",
+	"multimedia::images",
+]
 
 [badges]
-travis-ci = {repository = "tversteeg/blit"}
+travis-ci = { repository = "tversteeg/blit" }
 
 [features]
 default = ["image", "aseprite"]
 
 [dependencies]
-bincode = "1.2.1"
-serde = "1.0.106"
-serde_derive = "1.0.106"
-quick-error = "1.2.3"
-num-traits = "0.2.11"
-image = { version = "0.23.3", optional = true }
+bincode = "1.3.3"
+serde = "1.0.152"
+serde_derive = "1.0.152"
+quick-error = "2.0.1"
+num-traits = "0.2.15"
+image = { version = "0.24.5", optional = true }
 aseprite = { version = "0.1.3", optional = true }
 
 [[bench]]
@@ -34,7 +39,7 @@ name = "benchmarks"
 harness = false
 
 [dev-dependencies]
-image = "0.23.3"
-minifb = "0.16.0"
-serde_json = "1.0.51"
-criterion = "0.3.1"
+image = "0.24.5"
+minifb = "0.23.0"
+serde_json = "1.0.93"
+criterion = "0.4.0"

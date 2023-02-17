@@ -2,15 +2,15 @@ use super::*;
 use aseprite::*;
 use std::time::Duration;
 
-quick_error! {
+quick_error::quick_error! {
     #[derive(Debug)]
     pub enum AnimationError {
         NoFrameTagsInMetadata {
-            description("no frame tags field in metadata")
+            display("no frame tags field in metadata")
         }
 
         NoMatchingTag {
-            description("no tag found which is equal to the passed tag")
+            display("no tag found which is equal to the passed tag")
         }
     }
 }

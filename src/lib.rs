@@ -2,26 +2,10 @@
 
 //! Draw sprites quickly using bitwise operations and a masking color.
 //!
-//! # Usage
+//! # Example
 //!
-//! This crate is [on crates.io](https://crates.io/crates/blit) and can be used by adding
-//! `blit` to the dependencies in your project's `Cargo.toml`.
-//!
-//! ```toml
-//! [dependencies]
-//! blit = "0.5"
 //! ```
-//!
-//! and this to your crate root:
-//!
-//! ```rust
-//! extern crate blit;
-//! ```
-//!
-//! # Examples
-//!
-//! ```ignore
-//! extern crate image;
+//! use blit::{BlitExt, Color};
 //!
 //! const WIDTH: usize = 180;
 //! const HEIGHT: usize = 180;
@@ -29,7 +13,7 @@
 //!
 //! let mut buffer: Vec<u32> = vec![0xFF_FF_FF_FF; WIDTH * HEIGHT];
 //!
-//! let img = image::open("examples/smiley.png").unwrap();
+//! let img = image::open("examples/smiley_rgb.png").unwrap();
 //! let img_rgb = img.as_rgb8().unwrap();
 //!
 //! // Blit directly to the buffer
@@ -110,6 +94,23 @@ impl Color {
     /// Return the wrapped `u32` object.
     pub fn u32(self) -> u32 {
         self.0
+    }
+
+    /// Alpha color.
+    ///
+    /// This is a special color and won't be rendered on top of the other colors.
+    pub fn alpha() -> Self {
+        Self(0xFF_00_00_00)
+    }
+
+    /// White color.
+    pub fn white() -> Self {
+        Self(0x00_FF_FF_FF)
+    }
+
+    /// Black color.
+    pub fn black() -> Self {
+        Self(0x00_00_00_00)
     }
 }
 
