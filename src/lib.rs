@@ -4,7 +4,7 @@
 //!
 //! # Usage
 //!
-//! This crate is [on crates.io](htpps://crates.io/crates/blit) and can be used by adding
+//! This crate is [on crates.io](https://crates.io/crates/blit) and can be used by adding
 //! `blit` to the dependencies in your project's `Cargo.toml`.
 //!
 //! ```toml
