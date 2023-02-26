@@ -1,5 +1,3 @@
-#![crate_name = "blit"]
-
 //! Draw sprites quickly using bitwise operations and a masking color.
 //!
 //! # Example
@@ -140,7 +138,7 @@ impl BlittablePrimitive for u32 {
 }
 
 /// A data structure holding a color and a mask buffer to make blitting on a buffer real fast.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlitBuffer {
     width: i32,
     height: i32,
