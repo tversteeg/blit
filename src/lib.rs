@@ -31,23 +31,10 @@
 //! blit_buffer.save("smiley.blit");
 //! ```
 
-extern crate bincode;
-#[macro_use]
-extern crate serde_derive;
-#[macro_use]
-extern crate quick_error;
-#[cfg(feature = "aseprite")]
-extern crate aseprite;
-#[cfg(feature = "image")]
-extern crate image;
-#[cfg(feature = "image")]
-extern crate num_traits;
-
 use bincode::{deserialize, serialize_into};
+use serde::{Deserialize, Serialize};
 use std::{
-    cmp,
     error::Error,
-    fmt,
     fs::File,
     io::{BufWriter, Read},
     path::Path,
@@ -124,8 +111,8 @@ impl From<u32> for Color {
     }
 }
 
-impl fmt::Debug for Color {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl std::fmt::Debug for Color {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&format!("{:x?}", self.0))
     }
 }
@@ -168,10 +155,10 @@ impl BlitBuffer {
             return;
         }
 
-        let dst_start = (cmp::max(offset.0, 0), cmp::max(offset.1, 0));
+        let dst_start = (std::cmp::max(offset.0, 0), std::cmp::max(offset.1, 0));
         let dst_end = (
-            cmp::min(offset.0 + src_size.0, dst_size.0),
-            cmp::min(offset.1 + src_size.1, dst_size.1),
+            std::cmp::min(offset.0 + src_size.0, dst_size.0),
+            std::cmp::min(offset.1 + src_size.1, dst_size.1),
         );
 
         for dst_y in dst_start.1..dst_end.1 {
@@ -206,10 +193,10 @@ impl BlitBuffer {
 
         let src_size = (self.width, self.height);
 
-        let dst_start = (cmp::max(offset.0, 0), cmp::max(offset.1, 0));
+        let dst_start = (std::cmp::max(offset.0, 0), std::cmp::max(offset.1, 0));
         let dst_end = (
-            cmp::min(offset.0 + sub_rect.2, dst_size.0),
-            cmp::min(offset.1 + sub_rect.3, dst_size.1),
+            std::cmp::min(offset.0 + sub_rect.2, dst_size.0),
+            std::cmp::min(offset.1 + sub_rect.3, dst_size.1),
         );
 
         for dst_y in dst_start.1..dst_end.1 {

@@ -93,11 +93,11 @@ impl BlitExt for RgbImage {
         let (width, height) = self.dimensions();
 
         // Make sure only the pixels get rendered that are inside the dst
-        let min_x = cmp::max(-offset.0, 0);
-        let min_y = cmp::max(-offset.1, 0);
+        let min_x = std::cmp::max(-offset.0, 0);
+        let min_y = std::cmp::max(-offset.1, 0);
 
-        let max_x = cmp::min(dst_size.0 - offset.0, width as i32);
-        let max_y = cmp::min(dst_size.1 - offset.1, height as i32);
+        let max_x = std::cmp::min(dst_size.0 - offset.0, width as i32);
+        let max_y = std::cmp::min(dst_size.1 - offset.1, height as i32);
 
         for y in min_y..max_y {
             for x in min_x..max_x {
@@ -161,11 +161,11 @@ impl BlitExt for RgbaImage {
         let (width, height) = self.dimensions();
 
         // Make sure only the pixels get rendered that are inside the dst
-        let min_x = cmp::max(-offset.0, 0);
-        let min_y = cmp::max(-offset.1, 0);
+        let min_x = std::cmp::max(-offset.0, 0);
+        let min_y = std::cmp::max(-offset.1, 0);
 
-        let max_x = cmp::min(dst_size.0 - offset.0, width as i32);
-        let max_y = cmp::min(dst_size.1 - offset.1, height as i32);
+        let max_x = std::cmp::min(dst_size.0 - offset.0, width as i32);
+        let max_y = std::cmp::min(dst_size.1 - offset.1, height as i32);
 
         for y in min_y..max_y {
             for x in min_x..max_x {
