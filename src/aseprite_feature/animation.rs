@@ -1,12 +1,10 @@
 use std::{
     error::Error,
-    fs::File,
-    io::{BufWriter, Read},
-    path::Path,
     time::Duration,
 };
 
 use aseprite::SpritesheetData;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use crate::{aseprite_feature::AnimationError, BlitBuffer};
@@ -114,7 +112,8 @@ impl Animation {
 }
 
 /// `BlitBuffer` with extra information and functions to animate a sheet.
-#[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug)]
 pub struct AnimationBlitBuffer {
     buffer: BlitBuffer,
     info: SpritesheetData,
@@ -155,43 +154,5 @@ impl AnimationBlitBuffer {
         info: &Animation,
     ) -> Result<(), Box<dyn Error>> {
         self.blit_frame(dst, dst_width, offset, info.frame_current)
-    }
-
-    /// Saves the buffer to a file at the path specified.
-    /// A custom binary format is used for this.
-    pub fn save<P>(&self, path: P) -> Result<(), Box<dyn Error>>
-    where
-        P: AsRef<Path>,
-    {
-        let mut file = File::create(path)?;
-        {
-            let mut writer = BufWriter::new(&mut file);
-            bincode::serialize_into(&mut writer, &self)?;
-        }
-        file.sync_all()?;
-
-        Ok(())
-    }
-
-    /// Create a new buffer from a file at the path specified.
-    /// The file needs to be the custom binary format.
-    pub fn open<P>(path: P) -> Result<Self, Box<dyn Error>>
-    where
-        P: AsRef<Path>,
-    {
-        let mut file = File::open(path)?;
-
-        let mut data = Vec::new();
-        file.read_to_end(&mut data)?;
-
-        AnimationBlitBuffer::from_memory(&data[..])
-    }
-
-    /// Create a new buffer from a file at the path specified.
-    /// The array needs to be the custom binary format.
-    pub fn from_memory(buffer: &[u8]) -> Result<Self, Box<dyn Error>> {
-        let buffer = bincode::deserialize(buffer)?;
-
-        Ok(buffer)
     }
 }

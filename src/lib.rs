@@ -31,14 +31,9 @@
 //! blit_buffer.save("smiley.blit");
 //! ```
 
-use bincode::{deserialize, serialize_into};
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::{
-    error::Error,
-    fs::File,
-    io::{BufWriter, Read},
-    path::Path,
-};
+
 
 #[cfg(feature = "image")]
 pub mod image_feature;
@@ -62,7 +57,8 @@ trait BlittablePrimitive {
 /// 0x00_FF_00_00: red
 /// 0x00_00_FF_00: green
 /// 0x00_00_00_FF: blue
-#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, Eq, PartialEq, Default)]
 pub struct Color(u32);
 
 impl Color {
@@ -249,44 +245,6 @@ impl BlitBuffer {
             data,
             mask_color,
         }
-    }
-
-    /// Saves the buffer to a file at the path specified.
-    /// A custom binary format is used for this.
-    pub fn save<P>(&self, path: P) -> Result<(), Box<dyn Error>>
-    where
-        P: AsRef<Path>,
-    {
-        let mut file = File::create(path)?;
-        {
-            let mut writer = BufWriter::new(&mut file);
-            serialize_into(&mut writer, &self)?;
-        }
-        file.sync_all()?;
-
-        Ok(())
-    }
-
-    /// Create a new buffer from a file at the path specified.
-    /// The file needs to be the custom binary format.
-    pub fn open<P>(path: P) -> Result<Self, Box<dyn Error>>
-    where
-        P: AsRef<Path>,
-    {
-        let mut file = File::open(path)?;
-
-        let mut data = Vec::new();
-        file.read_to_end(&mut data)?;
-
-        BlitBuffer::from_memory(&data[..])
-    }
-
-    /// Create a new buffer from a file at the path specified.
-    /// The array needs to be the custom binary format.
-    pub fn from_memory(buffer: &[u8]) -> Result<Self, Box<dyn Error>> {
-        let buffer = deserialize(buffer)?;
-
-        Ok(buffer)
     }
 
     /// Get the size of the buffer in pixels.

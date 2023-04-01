@@ -47,10 +47,6 @@ fn main() {
     // It's not necessarily to use the `as_rgb*` for this
     let blit_buf = blit_buffer(&img, MASK_COLOR);
 
-    // Save the buffer to disk and load it again
-    blit_buf.save("smiley.blit").unwrap();
-    let blit_buf = BlitBuffer::open("smiley.blit").unwrap();
-
     let blit_size = blit_buf.size();
     let half_size = (blit_size.0 / 2, blit_size.1 / 2);
 
