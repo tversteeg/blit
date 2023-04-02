@@ -29,7 +29,7 @@
 //! # }}
 //! ```
 
-use palette::{rgb::channels::Argb, IntoColor, Packed};
+use palette::{rgb::channels::Argb, Packed};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -80,7 +80,7 @@ impl BlitBuffer {
     /// It's assumed that the alpha channel in the resulting pixel is properly set.
     /// The alpha treshold is the offset point at which an alpha value will be used as either a transparent pixel or a colored one.
     pub fn from_buffer(src: &[Color], width: i32, alpha_treshold: u8) -> Self {
-        Self::from_iter(src.iter().map(|pixel| *pixel), width, alpha_treshold)
+        Self::from_iter(src.iter().copied(), width, alpha_treshold)
     }
 
     /// Create a instance from a iterator of ARGB data packed in a single `u32`.
@@ -91,13 +91,13 @@ impl BlitBuffer {
     where
         I: Iterator<Item = Color>,
     {
-        let alpha_treshold = alpha_treshold as Color;
+        // Shift the alpha to the highest bits so we can do a direct comparison without needing to shift every pixel again
+        let alpha_treshold = (alpha_treshold as Color) << 24;
 
         // Create the data buffer filled with transparent pixels
         let data = iter
             .map(|pixel| {
-                let alpha = pixel >> 24;
-                if alpha < alpha_treshold {
+                if pixel < alpha_treshold {
                     0x00_00_00_00
                 } else {
                     pixel | 0xFF_00_00_00
@@ -116,11 +116,15 @@ impl BlitBuffer {
     }
 
     /// Blit the image on a buffer using bitwise operations.
-    pub fn blit(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32)) {
-        let src_size = (self.width, self.height);
-        let dst_size = (dst_width as i32, (dst.len() / dst_width) as i32);
+    pub fn blit(&self, dst: &mut [u32], dst_width: usize, (offset_x, offset_y): (i32, i32)) {
+        let dst_height = dst.len() / dst_width;
 
-        if offset == (0, 0) && dst_size == src_size {
+        let dst_width_i32 = dst_width as i32;
+        let dst_height_i32 = dst_height as i32;
+
+        if (offset_x, offset_y) == (0, 0)
+            && (dst_width_i32, dst_height_i32) == (self.width, self.height)
+        {
             // If the sizes match and the buffers are aligned we don't have to do any special
             // bounds checks
             dst.iter_mut()
@@ -132,28 +136,41 @@ impl BlitBuffer {
             return;
         }
 
-        let dst_start = (offset.0.max(0), offset.1.max(0));
-        let dst_end = (
-            (offset.0 + src_size.0).min(dst_size.0),
-            (offset.1 + src_size.1).min(dst_size.1),
-        );
+        // Region we need to draw in
+        let draw_start_x = offset_x.max(0);
+        let draw_start_y = offset_y.max(0);
+        let draw_end_x = (offset_x + self.width).min(dst_width_i32);
+        let draw_end_y = (offset_y + self.height).min(dst_height_i32);
+        let draw_start_x_usize = draw_start_x as usize;
+        let draw_start_y_usize = draw_start_y as usize;
+        let draw_end_x_usize = draw_end_x as usize;
+        let draw_end_y_usize = draw_end_y as usize;
 
-        for dst_y in dst_start.1..dst_end.1 {
-            let src_y = dst_y - offset.1;
+        // Pixel ranges in the blit buffer that we need to draw
+        let blit_pixel_start_x = (draw_start_x - offset_x) as usize;
+        let blit_pixel_start_y = (draw_start_y - offset_y) as usize;
 
-            let dst_y_index = dst_y * dst_size.0;
-            let src_y_index = src_y * src_size.0;
+        // How many pixels we need to blit in total
+        let pixels_x = draw_end_x_usize - draw_start_x_usize;
+        let pixels_y = draw_end_y_usize - draw_start_y_usize;
 
-            for dst_x in dst_start.0..dst_end.0 {
-                let src_x = dst_x - offset.0;
+        let blit_width_usize = self.width as usize;
 
-                let src_index = (src_x + src_y_index) as usize;
-                let dst_index = (dst_x + dst_y_index) as usize;
+        for y in 0..pixels_y {
+            // Range of horizontal pixel we need to blit for this y
+            let blit_start_x = blit_pixel_start_x + (blit_pixel_start_y + y) * blit_width_usize;
+            let blit_end_x = blit_start_x + pixels_x;
+            let dst_start_x = draw_start_x_usize + (draw_start_y_usize + y) * dst_width;
+            let dst_end_x = dst_start_x + pixels_x;
 
-                // First draw the mask as black on the background using an AND operation, and then
-                // draw the colors using an OR operation
-                dst[dst_index] = blit(dst[dst_index], self.data[src_index]);
-            }
+            // Same size iterators over both our buffer and the output buffer
+            let blit_iter = self.data[blit_start_x..blit_end_x].iter();
+            let dst_iter = dst[dst_start_x..dst_end_x].iter_mut();
+
+            // Blit each pixel
+            dst_iter.zip(blit_iter).for_each(|(dst_pixel, blit_pixel)| {
+                *dst_pixel = blit(*dst_pixel, *blit_pixel);
+            });
         }
     }
 

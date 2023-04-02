@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use image::{GenericImageView, ImageBuffer, Pixel, Primitive, RgbImage, RgbaImage};
+use image::{ImageBuffer, Pixel};
 use num_traits::NumCast;
 use palette::{rgb::channels::Argb, Packed};
 
@@ -11,7 +11,6 @@ where
     P: Pixel,
     Container: Deref<Target = [P::Subpixel]>,
 {
-    /// Allow any image to be converted to a blitbuffer
     fn to_blit_buffer_with_mask_color<C>(&self, mask_color: C) -> BlitBuffer
     where
         C: Into<Packed<Argb>>,
@@ -19,12 +18,12 @@ where
         let (width, _height) = self.dimensions();
 
         // Remove the alpha channel
-        let mask_color = mask_color.into().color & 0x00_FF_FF_FF;
+        let mask_color = mask_color.into().color | 0xFF_00_00_00;
 
         BlitBuffer::from_iter(
             self.pixels().map(|pixel| pixel.to_rgba()).map(|pixel| {
                 let pixel = color_from_u8(
-                    0x00,
+                    0xFF,
                     NumCast::from(pixel[0]).unwrap(),
                     NumCast::from(pixel[1]).unwrap(),
                     NumCast::from(pixel[2]).unwrap(),

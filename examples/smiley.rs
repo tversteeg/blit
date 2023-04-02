@@ -25,16 +25,15 @@ fn main() {
 
     let img = image::open("examples/smiley_rgba.png").unwrap();
     println!("Loaded RGBA image with size {:?}", img.dimensions());
-    let img_size = img.dimensions();
 
-    let rgba = img.into_rgba8().to_blit_buffer_with_mask_color(MASK_COLOR);
-    rgba.blit(&mut buffer, WIDTH, (img_size.0 as i32, 0));
+    let rgba = img.into_rgba8().to_blit_buffer_with_alpha(127);
+    rgba.blit(&mut buffer, WIDTH, (0, 0));
 
     let img = image::open("examples/smiley_rgb.png").unwrap();
     println!("Loaded RGB image with size {:?}", img.dimensions());
     let img_size = img.dimensions();
 
-    let rgb = img.into_rgba8().to_blit_buffer_with_alpha(127);
+    let rgb = img.into_rgb8().to_blit_buffer_with_mask_color(MASK_COLOR);
     rgb.blit(&mut buffer, WIDTH, (img_size.0 as i32, 0));
 
     let blit_size = rgb.size();

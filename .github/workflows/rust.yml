@@ -64,7 +64,7 @@ jobs:
   # On both Rust stable and Rust nightly
   test:
     name: Test
-    runs-on: ubunte-latest
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:

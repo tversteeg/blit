@@ -25,9 +25,9 @@ impl AnimationBlitBuffer {
     /// Draw the current frame using the animation info.
     pub fn blit(
         &self,
-        dst: &mut [u32],
-        dst_width: usize,
-        offset: (i32, i32),
+        _dst: &mut [u32],
+        _dst_width: usize,
+        _offset: (i32, i32),
     ) -> Result<(), Box<dyn Error>> {
         todo!()
     }
