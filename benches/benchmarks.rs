@@ -10,7 +10,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     let img_rgba = image::open("examples/smiley_rgba.png").unwrap();
     let rgba = img_rgba.as_rgba8().unwrap();
 
-    let blit = rgb.to_blit_buffer(Color::from_u32(0xFF_00_FF));
+    let blit = rgb.to_blit_buffer_with_mask_color(0xFF_00_FF);
     let size = blit.size();
 
     c.bench_function("buffer", |b| {
@@ -46,7 +46,11 @@ fn criterion_benchmark(c: &mut Criterion) {
 
         b.iter(|| {
             for x in 0..ITERATIONS {
-                rgb.blit(&mut buffer, SIZE, (x * 100, 0), Color::from_u32(0xFF_00_FF));
+                rgb.to_blit_buffer_with_mask_color(0xFF_00_FF).blit(
+                    &mut buffer,
+                    SIZE,
+                    (x * 100, 0),
+                );
             }
         });
     });
@@ -56,7 +60,8 @@ fn criterion_benchmark(c: &mut Criterion) {
 
         b.iter(|| {
             for x in 0..ITERATIONS {
-                rgba.blit(&mut buffer, SIZE, (x * 100, 0), Color::from_u32(0xFF_00_FF));
+                rgba.to_blit_buffer_with_alpha(127)
+                    .blit(&mut buffer, SIZE, (x * 100, 0));
             }
         });
     });

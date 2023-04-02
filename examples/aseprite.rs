@@ -18,9 +18,9 @@ mod example {
 
         // Open the animation spritesheet image
         let img = image::open(image_path).unwrap();
-        let rgba = img.as_rgba8().unwrap();
+        let rgba = img.into_rgb8();
         // Convert it to a blitbuffer
-        let blit_buf = rgba.to_blit_buffer(Color::from_u32(MASK_COLOR));
+        let blit_buf = rgba.to_blit_buffer_with_mask_color(MASK_COLOR);
 
         // Open the spritesheet info
         let file = File::open(json_path).unwrap();

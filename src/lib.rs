@@ -1,28 +1,27 @@
 //! Draw sprites quickly using bitwise operations and a masking color.
 //!
+//! All colors can be constructed from the [`palette`](https://crates.io/crates/palette) crate or directly with an RGB `u32` where the alpha channel is ignored.
+//!
 //! # Example
 //!
 //! ```
 //! # #[cfg(feature = "image")] mod test {
-//! use blit::{BlitExt, Color};
+//! use blit::BlitExt;
 //!
 //! const WIDTH: usize = 180;
 //! const HEIGHT: usize = 180;
 //! const MASK_COLOR: u32 = 0xFF_00_FF;
 //! # fn main() {
+//! // Create a buffer in which we'll draw our image
 //! let mut buffer: Vec<u32> = vec![0xFF_FF_FF_FF; WIDTH * HEIGHT];
 //!
-//! let img = image::open("examples/smiley_rgb.png").unwrap();
-//! let img_rgb = img.as_rgb8().unwrap();
+//! // Load the image from disk using the `image` crate
+//! let img = image::open("examples/smiley_rgb.png").unwrap().into_rgb8();
 //!
-//! // Blit directly to the buffer
-//! let pos = (0, 0);
-//! img_rgb.blit(&mut buffer, WIDTH, pos, Color::from_u32(MASK_COLOR));
+//! // Blit by creating a special blitting buffer first where the MASK_COLOR will be the color that will be made transparent
+//! let blit_buffer = img.to_blit_buffer_with_mask_color(MASK_COLOR);
 //!
-//! // Blit by creating a special blitting buffer first, this has some initial
-//! // overhead but is a lot faster after multiple calls
-//! let blit_buffer = img_rgb.to_blit_buffer(Color::from_u32(MASK_COLOR));
-//!
+//! // Draw the image 2 times to the buffer
 //! let pos = (10, 10);
 //! blit_buffer.blit(&mut buffer, WIDTH, pos);
 //! let pos = (20, 20);
@@ -30,6 +29,7 @@
 //! # }}
 //! ```
 
+use palette::{rgb::channels::Argb, IntoColor, Packed};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -42,98 +42,80 @@ pub mod aseprite_feature;
 #[cfg(feature = "aseprite")]
 pub use aseprite_feature::*;
 
-/// A trait so that both `Color` and `u32` can do blitting operations.
-trait BlittablePrimitive {
-    /// First draw the mask as black on the background using an AND operation, and then draw the color using an OR operation.
-    fn blit(&mut self, color: Self, mask: Self);
-}
+/// Internal representation of a color.
+type Color = u32;
 
-/// A newtype representing the color in a buffer.
-///
-/// It is divided into alpha (not used), red, green & blue:
-/// 0xFF_00_00_00: alpha (not used)
-/// 0x00_FF_00_00: red
-/// 0x00_00_FF_00: green
-/// 0x00_00_00_FF: blue
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Copy, Clone, Eq, PartialEq, Default)]
-pub struct Color(u32);
-
-impl Color {
-    /// Create a color from a 32 bits unsigned int, discard the alpha (last 8 bits).
-    pub fn from_u32(color: u32) -> Self {
-        Color(color | 0xFF_00_00_00)
-    }
-
-    /// Create a color from 3 8 bits unsigned ints and pack them into a 32 bit unsigned int.
-    pub fn from_u8(red: u8, green: u8, blue: u8) -> Self {
-        Color(0xFF_00_00_00 | (u32::from(red) << 16) | (u32::from(green) << 8) | u32::from(blue))
-    }
-
-    /// Return the wrapped `u32` object.
-    pub fn u32(self) -> u32 {
-        self.0
-    }
-
-    /// Alpha color.
+/// A trait adding blitting functions to image types.
+pub trait BlitExt {
+    /// Convert the image to a custom `BlitBuffer` type which is optimized for applying the blitting operations.
     ///
-    /// This is a special color and won't be rendered on top of the other colors.
-    pub fn alpha() -> Self {
-        Self(0xFF_00_00_00)
-    }
+    /// It's assumed that the alpha channel in the resulting pixel is properly set.
+    /// The alpha treshold is the offset point at which an alpha value will be used as either a transparent pixel or a colored one.
+    fn to_blit_buffer_with_alpha(&self, alpha_treshold: u8) -> BlitBuffer;
 
-    /// White color.
-    pub fn white() -> Self {
-        Self(0x00_FF_FF_FF)
-    }
-
-    /// Black color.
-    pub fn black() -> Self {
-        Self(0x00_00_00_00)
-    }
-}
-
-impl BlittablePrimitive for Color {
-    fn blit(&mut self, color: Self, mask: Self) {
-        self.0.blit(mask.0, color.0);
-    }
-}
-
-impl From<u32> for Color {
-    fn from(raw: u32) -> Self {
-        Self::from_u32(raw)
-    }
-}
-
-impl std::fmt::Debug for Color {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&format!("{:x?}", self.0))
-    }
-}
-
-impl BlittablePrimitive for u32 {
-    fn blit(&mut self, color: Self, mask: Self) {
-        // First draw the mask as black on the background using an AND operation, and then draw the colors using an OR operation
-        *self = *self & mask | color;
-    }
+    /// Convert the image to a custom `BlitBuffer` type which is optimized for applying the blitting operations.
+    ///
+    /// Ignore the alpha channel if set and use only a single color for transparency.
+    fn to_blit_buffer_with_mask_color<C>(&self, mask_color: C) -> BlitBuffer
+    where
+        C: Into<Packed<Argb>>;
 }
 
 /// A data structure holding a color and a mask buffer to make blitting on a buffer real fast.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone)]
 pub struct BlitBuffer {
+    /// Image width in pixels.
     width: i32,
+    /// Image height in pixels.
     height: i32,
 
-    // The first field of the tuple is the color, the second the mask
-    data: Vec<(Color, Color)>,
-
-    mask_color: Color,
+    /// Vector of colors, the highest 8 bits are alpha and the remaining 24 bits the RGB color channels.
+    data: Vec<Color>,
 }
 
 impl BlitBuffer {
-    /// Blit the image on a buffer using bitwise operations--this is a lot faster than
-    /// `blit_with_mask_color`.
+    /// Create a instance from a buffer of ARGB data packed in a single `u32`.
+    ///
+    /// It's assumed that the alpha channel in the resulting pixel is properly set.
+    /// The alpha treshold is the offset point at which an alpha value will be used as either a transparent pixel or a colored one.
+    pub fn from_buffer(src: &[Color], width: i32, alpha_treshold: u8) -> Self {
+        Self::from_iter(src.iter().map(|pixel| *pixel), width, alpha_treshold)
+    }
+
+    /// Create a instance from a iterator of ARGB data packed in a single `u32`.
+    ///
+    /// It's assumed that the alpha channel in the resulting pixel is properly set.
+    /// The alpha treshold is the offset point at which an alpha value will be used as either a transparent pixel or a colored one.
+    pub fn from_iter<I>(iter: I, width: i32, alpha_treshold: u8) -> Self
+    where
+        I: Iterator<Item = Color>,
+    {
+        let alpha_treshold = alpha_treshold as Color;
+
+        // Create the data buffer filled with transparent pixels
+        let data = iter
+            .map(|pixel| {
+                let alpha = pixel >> 24;
+                if alpha < alpha_treshold {
+                    0x00_00_00_00
+                } else {
+                    pixel | 0xFF_00_00_00
+                }
+            })
+            .collect::<Vec<_>>();
+
+        // We can calculate the height from the total buffer
+        let height = data.len() as i32 / width;
+
+        Self {
+            width,
+            height,
+            data,
+        }
+    }
+
+    /// Blit the image on a buffer using bitwise operations.
     pub fn blit(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32)) {
         let src_size = (self.width, self.height);
         let dst_size = (dst_width as i32, (dst.len() / dst_width) as i32);
@@ -144,16 +126,16 @@ impl BlitBuffer {
             dst.iter_mut()
                 .zip(&self.data[..])
                 .for_each(|(pixel, color)| {
-                    pixel.blit(color.0.u32(), color.1.u32());
+                    *pixel = blit(*pixel, *color);
                 });
 
             return;
         }
 
-        let dst_start = (std::cmp::max(offset.0, 0), std::cmp::max(offset.1, 0));
+        let dst_start = (offset.0.max(0), offset.1.max(0));
         let dst_end = (
-            std::cmp::min(offset.0 + src_size.0, dst_size.0),
-            std::cmp::min(offset.1 + src_size.1, dst_size.1),
+            (offset.0 + src_size.0).min(dst_size.0),
+            (offset.1 + src_size.1).min(dst_size.1),
         );
 
         for dst_y in dst_start.1..dst_end.1 {
@@ -170,8 +152,7 @@ impl BlitBuffer {
 
                 // First draw the mask as black on the background using an AND operation, and then
                 // draw the colors using an OR operation
-                let (color, mask) = self.data[src_index];
-                dst[dst_index].blit(color.u32(), mask.u32());
+                dst[dst_index] = blit(dst[dst_index], self.data[src_index]);
             }
         }
     }
@@ -208,41 +189,9 @@ impl BlitBuffer {
 
                 // First draw the mask as black on the background using an AND operation, and then
                 // draw the colors using an OR operation
-                let (color, mask) = self.data[src_index];
-                dst[dst_index].blit(color.u32(), mask.u32());
+                let color = self.data[src_index];
+                dst[dst_index] = blit(dst[dst_index], color);
             }
-        }
-    }
-
-    /// Create a instance from a buffer of `Color` data.
-    pub fn from_buffer<C>(src: &[u32], width: i32, mask_color: C) -> Self
-    where
-        C: Into<Color>,
-    {
-        let mask_color = mask_color.into();
-
-        let height = src.len() as i32 / width;
-
-        let pixels = (width * height) as usize;
-        let mut data: Vec<(Color, Color)> = vec![(Color::from_u32(0), Color::from_u32(0)); pixels];
-
-        for index in 0..src.len() {
-            let pixel = Color::from_u32(src[index]);
-
-            if pixel == mask_color {
-                // Set the mask
-                data[index].1 = Color::from_u32(0xFF_FF_FF);
-            } else {
-                // Set the color
-                data[index].0 = pixel;
-            }
-        }
-
-        BlitBuffer {
-            width,
-            height,
-            data,
-            mask_color,
         }
     }
 
@@ -260,19 +209,6 @@ impl BlitBuffer {
     pub fn height(&self) -> i32 {
         self.height
     }
-
-    /// Get the color of the mask.
-    pub fn mask_color(&self) -> Color {
-        self.mask_color
-    }
-
-    /// Get the raw pixels buffer, this is a costly operation.
-    pub fn to_raw_buffer(&self) -> Vec<u32> {
-        self.data
-            .iter()
-            .map(|(color, _mask)| color.0)
-            .collect::<_>()
-    }
 }
 
 impl std::fmt::Debug for BlitBuffer {
@@ -280,23 +216,24 @@ impl std::fmt::Debug for BlitBuffer {
         f.debug_struct("BlitBuffer")
             .field("width", &self.width)
             .field("height", &self.height)
-            .field("mask_color", &self.mask_color)
             .finish()
     }
 }
 
-/// A trait adding blitting functions to image types.
-pub trait BlitExt {
-    /// Convert the image to a custom `BlitBuffer` type which is optimized for applying the
-    /// blitting operations.
-    fn to_blit_buffer<C>(&self, mask_color: C) -> BlitBuffer
-    where
-        C: Into<Color>;
+/// The main logic of calculating the resulting color that needs to be drawn.
+#[inline(always)]
+fn blit(source: Color, color: Color) -> Color {
+    // Get the mask of the color as a single "u8"
+    let mask = color >> 24;
+    // Fill the RGB channel with the mask
+    let rgb_mask = (mask << 24) | (mask << 16) | (mask << 8) | mask;
 
-    /// Blit the image directly on a buffer.
-    fn blit<C>(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), mask_color: C)
-    where
-        C: Into<Color>;
+    // Get the inverse of the mask, but keep the alpha bits
+    let rgb_mask_inverse = rgb_mask ^ 0xFF_FF_FF;
+
+    // Either get the source color when the blit pixel is masked, or get the blit pixel when it isn't
+    // Always set the transparency
+    (source & rgb_mask_inverse) | (color & rgb_mask) | 0xFF_00_00_00
 }
 
 #[cfg(test)]
@@ -308,20 +245,33 @@ mod tests {
         let mut buffer = [0xFF, 0xFF_00, 0xFF_00_00, 0xFF, 0xFF_00, 0xFF_00_00];
 
         // The last number should be masked
-        let blit = BlitBuffer::from_buffer(&[0xAA, 0xAA_00, 0xAA_00_00, 0xBB, 0xBB, 0xBB], 2, 0xBB);
+        let blit = BlitBuffer::from_buffer(
+            &[
+                0xFF_00_00_AA,
+                0xFF_00_AA_00,
+                0xFF_AA_00_00,
+                0xBB,
+                0xBB,
+                0xBB,
+            ],
+            2,
+            127,
+        );
         blit.blit(&mut buffer, 2, (0, 0));
 
         // Create a copy but cast the u32 to a i32
+        let expected = [
+            0xAA | 0xFF_00_00_00,
+            0xAA_00 | 0xFF_00_00_00,
+            0xAA_00_00 | 0xFF_00_00_00,
+            0xFF | 0xFF_00_00_00,
+            0xFF_00 | 0xFF_00_00_00,
+            0xFF_00_00 | 0xFF_00_00_00,
+        ];
         assert_eq!(
-            buffer,
-            [
-                0xAA | 0xFF_00_00_00,
-                0xAA_00 | 0xFF_00_00_00,
-                0xAA_00_00 | 0xFF_00_00_00,
-                0xFF | 0xFF_00_00_00,
-                0xFF_00 | 0xFF_00_00_00,
-                0xFF_00_00 | 0xFF_00_00_00,
-            ]
+            buffer, expected,
+            "\nResult:\n{:08x?}\nExpected:\n{:08x?}",
+            &buffer, &expected
         );
     }
 }

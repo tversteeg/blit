@@ -27,27 +27,21 @@ fn main() {
     println!("Loaded RGBA image with size {:?}", img.dimensions());
     let img_size = img.dimensions();
 
-    let rgb = img.as_rgba8().unwrap();
-    rgb.blit(&mut buffer, WIDTH, (img_size.0 as i32, 0), MASK_COLOR);
+    let rgba = img.into_rgba8().to_blit_buffer_with_mask_color(MASK_COLOR);
+    rgba.blit(&mut buffer, WIDTH, (img_size.0 as i32, 0));
 
     let img = image::open("examples/smiley_rgb.png").unwrap();
     println!("Loaded RGB image with size {:?}", img.dimensions());
     let img_size = img.dimensions();
 
-    let rgb = img.as_rgb8().unwrap();
-    rgb.blit(&mut buffer, WIDTH, (0, 0), 0xFF_FF_FF);
+    let rgb = img.into_rgba8().to_blit_buffer_with_alpha(127);
+    rgb.blit(&mut buffer, WIDTH, (img_size.0 as i32, 0));
 
-    // Convert the image to a specific blit buffer type which is a lot faster
-    let _blit_buf = rgb.to_blit_buffer(MASK_COLOR);
-
-    // It's not necessarily to use the `as_rgb*` for this
-    let blit_buf = blit_buffer(&img, MASK_COLOR);
-
-    let blit_size = blit_buf.size();
+    let blit_size = rgb.size();
     let half_size = (blit_size.0 / 2, blit_size.1 / 2);
 
     // Draw the left half
-    blit_buf.blit_rect(
+    rgb.blit_rect(
         &mut buffer,
         WIDTH,
         (0, blit_size.1),
@@ -55,7 +49,7 @@ fn main() {
     );
 
     // Draw the bottom right part
-    blit_buf.blit_rect(
+    rgb.blit_rect(
         &mut buffer,
         WIDTH,
         (half_size.0, (blit_size.1 + half_size.1)),
@@ -68,7 +62,7 @@ fn main() {
             if draw_countdown <= 0 && window.get_mouse_down(MouseButton::Left) {
                 let x_pos = mouse.0 as i32 - (img_size.0 / 2) as i32;
                 let y_pos = mouse.1 as i32 - (img_size.1 / 2) as i32;
-                blit_buf.blit(&mut buffer, WIDTH, (x_pos, y_pos));
+                rgb.blit(&mut buffer, WIDTH, (x_pos, y_pos));
 
                 draw_countdown = 10;
             }

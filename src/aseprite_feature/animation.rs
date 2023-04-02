@@ -117,6 +117,7 @@ pub struct AnimationBlitBuffer {
 }
 
 impl AnimationBlitBuffer {
+    /// Construct a new buffer for animating a spritesheet.
     pub fn new(buffer: BlitBuffer, info: SpritesheetData) -> Self {
         AnimationBlitBuffer { buffer, info }
     }

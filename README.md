@@ -28,9 +28,7 @@ This should produce the following window:
 ## Examples
 
 ```rust
-extern crate image;
-
-use blit::*;
+use blit::BlitExt;
 
 const WIDTH: usize = 180;
 const HEIGHT: usize = 180;
@@ -53,7 +51,4 @@ let pos = (10, 10);
 blit_buffer.blit(&mut buffer, WIDTH, pos);
 let pos = (20, 20);
 blit_buffer.blit(&mut buffer, WIDTH, pos);
-
-// Save the blit buffer to a file
-blit_buffer.save("smiley.blit");
 ```
