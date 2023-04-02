@@ -120,7 +120,7 @@ impl BlittablePrimitive for u32 {
 
 /// A data structure holding a color and a mask buffer to make blitting on a buffer real fast.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct BlitBuffer {
     width: i32,
     height: i32,
@@ -272,6 +272,16 @@ impl BlitBuffer {
             .iter()
             .map(|(color, _mask)| color.0)
             .collect::<_>()
+    }
+}
+
+impl std::fmt::Debug for BlitBuffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BlitBuffer")
+            .field("width", &self.width)
+            .field("height", &self.height)
+            .field("mask_color", &self.mask_color)
+            .finish()
     }
 }
 
