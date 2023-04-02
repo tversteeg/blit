@@ -34,7 +34,6 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-
 #[cfg(feature = "image")]
 pub mod image_feature;
 #[cfg(feature = "image")]
@@ -121,7 +120,8 @@ impl BlittablePrimitive for u32 {
 }
 
 /// A data structure holding a color and a mask buffer to make blitting on a buffer real fast.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone)]
 pub struct BlitBuffer {
     width: i32,
     height: i32,
