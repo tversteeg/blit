@@ -3,12 +3,13 @@
 //! # Example
 //!
 //! ```
+//! # #[cfg(feature = "image")] mod test {
 //! use blit::{BlitExt, Color};
 //!
 //! const WIDTH: usize = 180;
 //! const HEIGHT: usize = 180;
 //! const MASK_COLOR: u32 = 0xFF_00_FF;
-//!
+//! # fn main() {
 //! let mut buffer: Vec<u32> = vec![0xFF_FF_FF_FF; WIDTH * HEIGHT];
 //!
 //! let img = image::open("examples/smiley_rgb.png").unwrap();
@@ -26,9 +27,7 @@
 //! blit_buffer.blit(&mut buffer, WIDTH, pos);
 //! let pos = (20, 20);
 //! blit_buffer.blit(&mut buffer, WIDTH, pos);
-//!
-//! // Save the blit buffer to a file
-//! blit_buffer.save("smiley.blit");
+//! # }}
 //! ```
 
 #[cfg(feature = "serde")]

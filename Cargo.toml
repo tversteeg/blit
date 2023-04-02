@@ -23,6 +23,9 @@ travis-ci = { repository = "tversteeg/blit" }
 
 [features]
 default = ["image", "aseprite", "serde"]
+image = ["dep:image"]
+aseprite = ["dep:aseprite"]
+serde = ["dep:serde"]
 
 [dependencies]
 bincode = "1.3.3"

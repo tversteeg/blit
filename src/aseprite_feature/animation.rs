@@ -1,7 +1,4 @@
-use std::{
-    error::Error,
-    time::Duration,
-};
+use std::{error::Error, time::Duration};
 
 use aseprite::SpritesheetData;
 #[cfg(feature = "serde")]

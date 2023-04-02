@@ -1,18 +1,14 @@
-extern crate blit;
-extern crate image;
-extern crate minifb;
-
-use blit::*;
-use image::GenericImageView;
-use minifb::*;
-
-const WIDTH: usize = 250;
-const HEIGHT: usize = 250;
-
-const MASK_COLOR: u32 = 0xFF_00_FF;
-
 #[cfg(feature = "image")]
 fn main() {
+    use blit::*;
+    use image::GenericImageView;
+    use minifb::*;
+
+    const WIDTH: usize = 250;
+    const HEIGHT: usize = 250;
+
+    const MASK_COLOR: u32 = 0xFF_00_FF;
+
     let mut buffer: Vec<u32> = vec![0x00_FF_FF_FF; WIDTH * HEIGHT];
 
     let options = WindowOptions {
