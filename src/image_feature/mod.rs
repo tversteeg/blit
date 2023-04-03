@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use image::{ImageBuffer, Pixel};
-use num_traits::NumCast;
+use num_traits::ToPrimitive;
 use palette::{rgb::channels::Argb, Packed};
 
 use crate::{BlitBuffer, BlitExt, Color};
@@ -22,16 +22,16 @@ where
 
         BlitBuffer::from_iter(
             self.pixels().map(|pixel| pixel.to_rgba()).map(|pixel| {
-                let pixel = color_from_u8(
+                let pixel = color_from_u64(
                     0xFF,
-                    NumCast::from(pixel[0]).unwrap(),
-                    NumCast::from(pixel[1]).unwrap(),
-                    NumCast::from(pixel[2]).unwrap(),
+                    ToPrimitive::to_u64(&pixel[0]).unwrap_or(0x0),
+                    ToPrimitive::to_u64(&pixel[1]).unwrap_or(0x0),
+                    ToPrimitive::to_u64(&pixel[2]).unwrap_or(0x0),
                 );
 
                 // If the pixel matches the mask color return nothing
                 if pixel == mask_color {
-                    0x00
+                    0x0
                 } else {
                     pixel
                 }
@@ -46,12 +46,12 @@ where
 
         BlitBuffer::from_iter(
             self.pixels().map(|pixel| pixel.to_rgba()).map(|pixel| {
-                color_from_u8(
+                color_from_u64(
                     // RGBA -> ARGB
-                    NumCast::from(pixel[3]).unwrap(),
-                    NumCast::from(pixel[0]).unwrap(),
-                    NumCast::from(pixel[1]).unwrap(),
-                    NumCast::from(pixel[2]).unwrap(),
+                    ToPrimitive::to_u64(&pixel[3]).unwrap_or(0x0),
+                    ToPrimitive::to_u64(&pixel[0]).unwrap_or(0x0),
+                    ToPrimitive::to_u64(&pixel[1]).unwrap_or(0x0),
+                    ToPrimitive::to_u64(&pixel[2]).unwrap_or(0x0),
                 )
             }),
             width as i32,
@@ -61,6 +61,9 @@ where
 }
 
 /// Convert separate u8 color components into a single packed color.
-fn color_from_u8(a: u8, r: u8, g: u8, b: u8) -> Color {
-    ((a as u32) << 24) | ((r as u32) << 16) | ((g as u32) << 8) | b as u32
+///
+/// The type is `u64` because that's the base conversion type of the `num_traits` crate.
+#[inline(always)]
+fn color_from_u64(a: u64, r: u64, g: u64, b: u64) -> Color {
+    ((a << 24) | (r << 16) | (g << 8) | b) as Color
 }

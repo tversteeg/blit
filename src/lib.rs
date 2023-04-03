@@ -29,6 +29,8 @@
 //! # }}
 //! ```
 
+use std::ops::Range;
+
 use palette::{rgb::channels::Argb, Packed};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -122,37 +124,57 @@ impl BlitBuffer {
         let dst_width_i32 = dst_width as i32;
         let dst_height_i32 = dst_height as i32;
 
+        // If the sizes match and the buffers are aligned we don't have to do any special bounds checks
         if (offset_x, offset_y) == (0, 0)
             && (dst_width_i32, dst_height_i32) == (self.width, self.height)
         {
-            // If the sizes match and the buffers are aligned we don't have to do any special
-            // bounds checks
-            dst.iter_mut()
-                .zip(&self.data[..])
-                .for_each(|(pixel, color)| {
-                    *pixel = blit(*pixel, *color);
-                });
+            // Due to there being no bound overlap since the dimensions are exactly the same we can treat this case like a single contiguous horizontal strip
+            self.blit_horizontal(dst, 0..dst.len(), 0..self.data.len());
 
             return;
         }
 
-        // Region we need to draw in
-        let draw_start_x = offset_x.max(0);
-        let draw_start_y = offset_y.max(0);
-        let draw_end_x = (offset_x + self.width).min(dst_width_i32);
-        let draw_end_y = (offset_y + self.height).min(dst_height_i32);
-        let draw_start_x_usize = draw_start_x as usize;
-        let draw_start_y_usize = draw_start_y as usize;
-        let draw_end_x_usize = draw_end_x as usize;
-        let draw_end_y_usize = draw_end_y as usize;
+        // We can blit the sub rectangle but it's our entire size
+        self.blit_rect(
+            dst,
+            dst_width,
+            (offset_x, offset_y),
+            (0, 0, self.width, self.height),
+        )
+    }
 
-        // Pixel ranges in the blit buffer that we need to draw
-        let blit_pixel_start_x = (draw_start_x - offset_x) as usize;
-        let blit_pixel_start_y = (draw_start_y - offset_y) as usize;
+    /// Blit a section of the image on a buffer.
+    ///
+    /// The sub rectangle is the section of the source that will be rendered.
+    /// Its values are (X, Y, Width, Height) in pixels.
+    /// A good mental model to keep for the section is that it's a view on the blit buffer that will be rendered.
+    pub fn blit_rect(
+        &self,
+        dst: &mut [u32],
+        dst_width: usize,
+        (offset_x, offset_y): (i32, i32),
+        (sub_rect_x, sub_rect_y, sub_rect_width, sub_rect_height): (i32, i32, i32, i32),
+    ) {
+        let dst_height = dst.len() / dst_width;
+
+        let dst_width_i32 = dst_width as i32;
+        let dst_height_i32 = dst_height as i32;
+
+        // Region we need to draw in
+        let dst_start_x = offset_x.max(0);
+        let dst_start_y = offset_y.max(0);
+        let dst_end_x = (offset_x + sub_rect_width).min(dst_width_i32) as usize;
+        let dst_end_y = (offset_y + sub_rect_height).min(dst_height_i32) as usize;
+        let dst_start_x_usize = dst_start_x as usize;
+        let dst_start_y_usize = dst_start_y as usize;
+
+        // Pixel ranges in the blit buffer that we need to dst
+        let blit_pixel_start_x = (dst_start_x - offset_x + sub_rect_x) as usize;
+        let blit_pixel_start_y = (dst_start_y - offset_y + sub_rect_y) as usize;
 
         // How many pixels we need to blit in total
-        let pixels_x = draw_end_x_usize - draw_start_x_usize;
-        let pixels_y = draw_end_y_usize - draw_start_y_usize;
+        let pixels_x = dst_end_x - dst_start_x_usize;
+        let pixels_y = dst_end_y - dst_start_y_usize;
 
         let blit_width_usize = self.width as usize;
 
@@ -160,55 +182,11 @@ impl BlitBuffer {
             // Range of horizontal pixel we need to blit for this y
             let blit_start_x = blit_pixel_start_x + (blit_pixel_start_y + y) * blit_width_usize;
             let blit_end_x = blit_start_x + pixels_x;
-            let dst_start_x = draw_start_x_usize + (draw_start_y_usize + y) * dst_width;
+            let dst_start_x = dst_start_x_usize + (dst_start_y_usize + y) * dst_width;
             let dst_end_x = dst_start_x + pixels_x;
 
-            // Same size iterators over both our buffer and the output buffer
-            let blit_iter = self.data[blit_start_x..blit_end_x].iter();
-            let dst_iter = dst[dst_start_x..dst_end_x].iter_mut();
-
-            // Blit each pixel
-            dst_iter.zip(blit_iter).for_each(|(dst_pixel, blit_pixel)| {
-                *dst_pixel = blit(*dst_pixel, *blit_pixel);
-            });
-        }
-    }
-
-    /// Blit a section of the image on a buffer.
-    pub fn blit_rect(
-        &self,
-        dst: &mut [u32],
-        dst_width: usize,
-        offset: (i32, i32),
-        sub_rect: (i32, i32, i32, i32),
-    ) {
-        let dst_size = (dst_width as i32, (dst.len() / dst_width) as i32);
-
-        let src_size = (self.width, self.height);
-
-        let dst_start = (std::cmp::max(offset.0, 0), std::cmp::max(offset.1, 0));
-        let dst_end = (
-            std::cmp::min(offset.0 + sub_rect.2, dst_size.0),
-            std::cmp::min(offset.1 + sub_rect.3, dst_size.1),
-        );
-
-        for dst_y in dst_start.1..dst_end.1 {
-            let src_y = dst_y - offset.1 + sub_rect.1;
-
-            let dst_y_index = dst_y * dst_size.0;
-            let src_y_index = src_y * src_size.0;
-
-            for dst_x in dst_start.0..dst_end.0 {
-                let src_x = dst_x - offset.0 + sub_rect.0;
-
-                let src_index = (src_x + src_y_index) as usize;
-                let dst_index = (dst_x + dst_y_index) as usize;
-
-                // First draw the mask as black on the background using an AND operation, and then
-                // draw the colors using an OR operation
-                let color = self.data[src_index];
-                dst[dst_index] = blit(dst[dst_index], color);
-            }
+            // Blit the horizontal slice
+            self.blit_horizontal(dst, dst_start_x..dst_end_x, blit_start_x..blit_end_x);
         }
     }
 
@@ -226,6 +204,33 @@ impl BlitBuffer {
     pub fn height(&self) -> i32 {
         self.height
     }
+
+    /// Blit a horizontal strip.
+    fn blit_horizontal(&self, dst: &mut [u32], dst_index: Range<usize>, blit_index: Range<usize>) {
+        // Same size iterators over both our buffer and the output buffer
+        let blit_iter = self.data[blit_index].iter();
+        let dst_iter = dst[dst_index].iter_mut();
+
+        // Blit each pixel
+        dst_iter.zip(blit_iter).for_each(|(dst_pixel, blit_pixel)| {
+            *dst_pixel = Self::blit_pixel(*dst_pixel, *blit_pixel);
+        });
+    }
+
+    /// Blit a single pixel.
+    ///
+    /// The main logic of calculating the resulting color that needs to be drawn.
+    #[inline(always)]
+    fn blit_pixel(dst_pixel: Color, blit_pixel: Color) -> Color {
+        // Set the pixel from the blit image if the mask value is set
+        if (blit_pixel >> 24) > 0 {
+            // Pixel from the blit buffer is not masked, use it
+            blit_pixel
+        } else {
+            // Pixel from the blit buffer is maskde, use the original color
+            dst_pixel
+        }
+    }
 }
 
 impl std::fmt::Debug for BlitBuffer {
@@ -235,22 +240,6 @@ impl std::fmt::Debug for BlitBuffer {
             .field("height", &self.height)
             .finish()
     }
-}
-
-/// The main logic of calculating the resulting color that needs to be drawn.
-#[inline(always)]
-fn blit(source: Color, color: Color) -> Color {
-    // Get the mask of the color as a single "u8"
-    let mask = color >> 24;
-    // Fill the RGB channel with the mask
-    let rgb_mask = (mask << 24) | (mask << 16) | (mask << 8) | mask;
-
-    // Get the inverse of the mask, but keep the alpha bits
-    let rgb_mask_inverse = rgb_mask ^ 0xFF_FF_FF;
-
-    // Either get the source color when the blit pixel is masked, or get the blit pixel when it isn't
-    // Always set the transparency
-    (source & rgb_mask_inverse) | (color & rgb_mask) | 0xFF_00_00_00
 }
 
 #[cfg(test)]
@@ -281,9 +270,9 @@ mod tests {
             0xAA | 0xFF_00_00_00,
             0xAA_00 | 0xFF_00_00_00,
             0xAA_00_00 | 0xFF_00_00_00,
-            0xFF | 0xFF_00_00_00,
-            0xFF_00 | 0xFF_00_00_00,
-            0xFF_00_00 | 0xFF_00_00_00,
+            0xFF,
+            0xFF_00,
+            0xFF_00_00,
         ];
         assert_eq!(
             buffer, expected,

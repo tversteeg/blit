@@ -1,5 +1,5 @@
 use blit::*;
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 const SIZE: usize = 1000;
 const ITERATIONS: i32 = 10;
@@ -13,27 +13,32 @@ fn criterion_benchmark(c: &mut Criterion) {
     let blit = rgb.to_blit_buffer_with_mask_color(0xFF_00_FF);
     let size = blit.size();
 
-    c.bench_function("buffer", |b| {
+    c.bench_function("blit", |b| {
         let mut buffer: Vec<u32> = vec![0; SIZE * SIZE];
 
         b.iter(|| {
             for x in 0..ITERATIONS {
-                blit.blit(&mut buffer, SIZE, (x * 100, 0));
+                blit.blit(&mut buffer, SIZE, black_box((x * 100, 0)));
             }
         });
     });
 
-    c.bench_function("buffer rect", |b| {
+    c.bench_function("blit sub rect", |b| {
         let mut buffer: Vec<u32> = vec![0; SIZE * SIZE];
 
         b.iter(|| {
             for x in 0..ITERATIONS {
-                blit.blit_rect(&mut buffer, SIZE, (x * 100, 0), (0, 0, size.0, size.1));
+                blit.blit_rect(
+                    &mut buffer,
+                    SIZE,
+                    black_box((x * 100, 0)),
+                    black_box((0, 0, size.0, size.1)),
+                );
             }
         });
     });
 
-    c.bench_function("exact fit", |b| {
+    c.bench_function("blit exact fit", |b| {
         let mut buffer: Vec<u32> = vec![0; (size.0 * size.1) as usize];
 
         b.iter(|| {
@@ -41,28 +46,15 @@ fn criterion_benchmark(c: &mut Criterion) {
         });
     });
 
-    c.bench_function("img rgb", |b| {
-        let mut buffer: Vec<u32> = vec![0; SIZE * SIZE];
-
+    c.bench_function("load img with mask", |b| {
         b.iter(|| {
-            for x in 0..ITERATIONS {
-                rgb.to_blit_buffer_with_mask_color(0xFF_00_FF).blit(
-                    &mut buffer,
-                    SIZE,
-                    (x * 100, 0),
-                );
-            }
+            rgb.to_blit_buffer_with_mask_color(0xFF_00_FF);
         });
     });
 
-    c.bench_function("img rgba", |b| {
-        let mut buffer: Vec<u32> = vec![0; SIZE * SIZE];
-
+    c.bench_function("load img with alpha", |b| {
         b.iter(|| {
-            for x in 0..ITERATIONS {
-                rgba.to_blit_buffer_with_alpha(127)
-                    .blit(&mut buffer, SIZE, (x * 100, 0));
-            }
+            rgba.to_blit_buffer_with_alpha(127);
         });
     });
 }
