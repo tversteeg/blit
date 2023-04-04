@@ -1,4 +1,4 @@
-//! Draw sprites quickly using bitwise operations and a masking color.
+//! Draw sprites quickly using a masking color or an alpha treshold.
 //!
 //! All colors can be constructed from the [`palette`](https://crates.io/crates/palette) crate or directly with an RGB `u32` where the alpha channel is ignored.
 //!
