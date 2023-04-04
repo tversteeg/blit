@@ -87,6 +87,8 @@ fn main() {
 
                 // Redraw the whole buffer if it resized
                 if buffer.len() != width * height {
+                    println!("Buffer resized to {width}x{height}, redrawing");
+
                     // Clear the buffer first
                     buffer.fill(BACKGROUND_COLOR);
 
@@ -113,6 +115,9 @@ fn main() {
                     let x_pos = mouse_pos.0 - (rgb.width() / 2) as i32;
                     let y_pos = mouse_pos.1 - (rgb.height() / 2) as i32;
                     rgb.blit(&mut buffer, width, (x_pos, y_pos));
+
+                    // Tell the window to redraw another frame
+                    window.request_redraw();
                 }
             }
             Event::WindowEvent {
