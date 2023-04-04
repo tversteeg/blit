@@ -44,9 +44,22 @@ winit = "0.28.3"
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 web-sys = { version = "0.3.61", features = ["CanvasRenderingContext2d", "Document", "Element", "HtmlCanvasElement", "ImageData", "Window"] }
 
+[target.wasm32.dev-dependencies]
+winit = "0.28.3"
+
+[[example]]
+name = "smiley"
+required-features = ["image"]
+
+[[example]]
+name = "aseprite-animation"
+required-features = ["aseprite", "image"]
+
+[[example]]
+name = "aseprite-9slice"
+required-features = ["aseprite", "image"]
+
 [[bench]]
 name = "benchmarks"
 harness = false
-
-[target.wasm32.dev-dependencies]
-winit = "0.28.3"
+required-features = ["image"]
