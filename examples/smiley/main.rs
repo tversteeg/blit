@@ -15,6 +15,8 @@ const BACKGROUND_COLOR: u32 = 0xFF_FF_CC_FF;
 
 /// Redraw the static images on the buffer.
 fn redraw(buffer: &mut [u32], rgb: &BlitBuffer, rgba: &BlitBuffer, width: usize) {
+    log::info!("Redrawing full buffer");
+
     // Draw the images at full size
     rgba.blit(buffer, width, (0, 0));
     rgb.blit(buffer, width, (rgb.width(), 0));
@@ -43,15 +45,15 @@ fn main() {
     let mut buffer: Vec<u32> = Vec::new();
 
     // Load the image from disk
-    let img = image::open("examples/smiley_rgba.png").unwrap();
-    println!("Loaded RGBA image with size {:?}", img.dimensions());
+    let img = image::load_from_memory(include_bytes!("./smiley_rgba.png")).unwrap();
+    log::info!("Loaded RGBA image with size {:?}", img.dimensions());
 
     // Convert the image to a blit buffer
     let rgba = img.into_rgba8().to_blit_buffer_with_alpha(127);
 
     // Load another image with a mask color from disk
-    let img = image::open("examples/smiley_rgb.png").unwrap();
-    println!("Loaded RGB image with size {:?}", img.dimensions());
+    let img = image::load_from_memory(include_bytes!("./smiley_rgb.png")).unwrap();
+    log::info!("Loaded RGB image with size {:?}", img.dimensions());
 
     // Also convert it to a blit buffer
     let rgb = img.into_rgb8().to_blit_buffer_with_mask_color(MASK_COLOR);
@@ -59,18 +61,11 @@ fn main() {
     // Setup a winit window
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
-    #[cfg(target_arch = "wasm32")]
-    {
-        use winit::platform::web::WindowExtWebSys;
 
-        web_sys::window()
-            .unwrap()
-            .document()
-            .body()
-            .unwrap()
-            .append_child(&window.canvas())
-            .unwrap();
-    }
+    // Setup the WASM canvas if running on the browser
+    #[cfg(target_arch = "wasm32")]
+    wasm::setup_canvas(&window);
+
     let mut graphics_context = unsafe { GraphicsContext::new(&window, &window) }.unwrap();
 
     // Keep track of the mouse position
@@ -139,4 +134,38 @@ fn main() {
             _ => {}
         }
     });
+}
+
+#[cfg(target_arch = "wasm32")]
+mod wasm {
+    use wasm_bindgen::prelude::*;
+    use winit::{platform::web::WindowExtWebSys, window::Window};
+
+    /// Run main on the browser.
+    #[wasm_bindgen(start)]
+    pub fn run() {
+        console_log::init_with_level(log::Level::Debug).expect("error initializing logger");
+
+        super::main();
+    }
+
+    /// Attach the winit window to a canvas.
+    pub fn setup_canvas(window: &Window) {
+        log::debug!("Binding window to HTML canvas");
+
+        let canvas = window.canvas();
+
+        let window = web_sys::window().unwrap();
+        let document = window.document().unwrap();
+        let body = document.body().unwrap();
+
+        canvas
+            .style()
+            .set_css_text("display:block; margin: auto; width: 600px; height: 400px");
+        body.append_child(&canvas).unwrap();
+
+        let header = document.create_element("h2").unwrap();
+        header.set_text_content(Some("Blit Example - Smiley"));
+        body.append_child(&header).unwrap();
+    }
 }
