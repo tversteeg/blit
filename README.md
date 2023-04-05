@@ -15,17 +15,58 @@ Add this to your `Cargo.toml`:
 blit = "0.6"
 ```
 
-### Run the example
+## Demos
 
-On Linux you need the `xorg-dev` package as required by `minifb`. `sudo apt install xorg-dev`
+### [Smiley](https://tversteeg.nl/blit/smiley/)
 
-    cargo run --example smiley
+Web: https://tversteeg.nl/blit/smiley/
 
-This should produce the following window:
+Uses the `["image"]` feature flag.
+
+Displays the use of loading an image, blitting it fully and also blitting a subrectangle from it.
+
+#### Local
+
+```console
+cargo run --example smiley
+```
+
+### [Aseprite Animation](https://tversteeg.nl/blit/aseprite-animation/)
+
+Web: https://tversteeg.nl/blit/aseprite-animation/
+
+Uses the `["image", "aseprite"]` feature flags.
+
+Displays the use of using the `AnimationBuffer` and `Animation` structs to create a simple time based animation.
+
+#### Local
+
+```console
+cargo run --example aseprite-animation
+```
+ 
+### [Aseprite 9 Slice](https://tversteeg.nl/blit/aseprite-9slice/)
+
+Web: https://tversteeg.nl/blit/aseprite-9slice/
+
+Uses the `["image", "aseprite"]` feature flags.
+
+#### Local
+
+```console
+cargo run --example aseprite-9slice
+```
 
 ![Example](img/example.png?raw=true)
 
-## Examples
+## Example Code
+
+Uses the `["image"]` feature flag:
+
+```toml
+[dependencies]
+blit = { version = "0.6", features = ["image"] }
+```
 
 ```rust
 use blit::BlitExt;
@@ -34,19 +75,16 @@ const WIDTH: usize = 180;
 const HEIGHT: usize = 180;
 const MASK_COLOR: u32 = 0xFF00FF;
 
+// The target buffer the image will be blit to
 let mut buffer: Vec<u32> = vec![0xFFFFFFFF; WIDTH * HEIGHT];
 
-let img = image::open("examples/smiley.png").unwrap();
-let img_rgb = img.as_rgb8().unwrap();
+// Open the example image using the image crate
+let img = image::open("examples/smiley.png").unwrap().into_rgb8();
 
-// Blit directly to the buffer
-let pos = (0, 0);
-img_rgb.blit(&mut buffer, WIDTH, pos, Color::from_u32(MASK_COLOR));
-
-// Blit by creating a special blitting buffer first, this has some initial
-// overhead but is a lot faster after multiple calls
+// Convert the image to a blit buffer
 let blit_buffer = img_rgb.to_blit_buffer(Color::from_u32(MASK_COLOR));
 
+// Blit the image twice to the buffer
 let pos = (10, 10);
 blit_buffer.blit(&mut buffer, WIDTH, pos);
 let pos = (20, 20);
