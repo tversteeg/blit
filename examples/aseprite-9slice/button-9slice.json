@@ -1,5 +1,6 @@
-{ "frames": {
-   "button-9slice.aseprite": {
+{ "frames": [
+   {
+    "filename": "button-9slice.aseprite",
     "frame": { "x": 0, "y": 0, "w": 25, "h": 24 },
     "rotated": false,
     "trimmed": false,
@@ -7,11 +8,10 @@
     "sourceSize": { "w": 25, "h": 24 },
     "duration": 100
    }
- },
+ ],
  "meta": {
   "app": "http://www.aseprite.org/",
   "version": "1.2.40-x64",
-  "image": "button-9slice.png",
   "format": "I8",
   "size": { "w": 25, "h": 24 },
   "scale": "1",

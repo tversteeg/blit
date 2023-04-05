@@ -1,4 +1,4 @@
-use blit::*;
+use blit::{BlitBuffer, BlitExt};
 use image::GenericImageView;
 use softbuffer::GraphicsContext;
 use winit::{
@@ -82,12 +82,12 @@ fn main() {
 
                 // Redraw the whole buffer if it resized
                 if buffer.len() != width * height {
-                    println!("Buffer resized to {width}x{height}, redrawing");
+                    log::info!("Buffer resized to {width}x{height}, redrawing");
 
                     // Clear the buffer first
                     buffer.fill(BACKGROUND_COLOR);
 
-                    // Resize the buffer with empty pictures
+                    // Resize the buffer with empty values
                     buffer.resize(width * height, BACKGROUND_COLOR);
 
                     // Redraw all static sprites
@@ -104,26 +104,22 @@ fn main() {
                     },
                 window_id,
                 ..
-            } => {
-                if window_id == window.id() {
-                    // Draw the picture at the center of the cursor
-                    let x_pos = mouse_pos.0 - (rgb.width() / 2) as i32;
-                    let y_pos = mouse_pos.1 - (rgb.height() / 2) as i32;
-                    rgb.blit(&mut buffer, width, (x_pos, y_pos));
+            } if window_id == window.id() => {
+                // Draw the picture at the center of the cursor
+                let x_pos = mouse_pos.0 - (rgb.width() / 2) as i32;
+                let y_pos = mouse_pos.1 - (rgb.height() / 2) as i32;
+                rgb.blit(&mut buffer, width, (x_pos, y_pos));
 
-                    // Tell the window to redraw another frame
-                    window.request_redraw();
-                }
+                // Tell the window to redraw another frame
+                window.request_redraw();
             }
             Event::WindowEvent {
                 event: WindowEvent::CursorMoved { position, .. },
                 window_id,
                 ..
-            } => {
-                if window_id == window.id() {
-                    mouse_pos.0 = position.x as i32;
-                    mouse_pos.1 = position.y as i32;
-                }
+            } if window_id == window.id() => {
+                mouse_pos.0 = position.x as i32;
+                mouse_pos.1 = position.y as i32;
             }
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
@@ -158,11 +154,12 @@ mod wasm {
         let window = web_sys::window().unwrap();
         let document = window.document().unwrap();
         let body = document.body().unwrap();
+        body.style().set_css_text("text-align: center");
 
-        canvas
-            .style()
-            .set_css_text("display:block; margin: auto; width: 600px; height: 400px");
         body.append_child(&canvas).unwrap();
+        canvas.style().set_css_text("display:block; margin: auto");
+        canvas.set_width(600);
+        canvas.set_height(400);
 
         let header = document.create_element("h2").unwrap();
         header.set_text_content(Some("Blit Example - Smiley"));

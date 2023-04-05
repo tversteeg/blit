@@ -44,6 +44,7 @@ serde_json = "1.0.95"
 softbuffer = "0.2.0"
 winit = "0.28.3"
 log = "0.4.17"
+web-time = "0.2.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 criterion = "0.4.0"
