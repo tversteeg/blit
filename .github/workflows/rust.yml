@@ -11,7 +11,7 @@ on:
 
 jobs:
   rustfmt:
-    name: Formatter Check
+    name: Formatter check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -89,3 +89,37 @@ jobs:
       # Run the ignored tests that expect the above setup
       - name: Run all tests
         run: cargo hack --feature-powerset test
+
+  wasm:
+    name: WASM examples
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      # Install rust stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+
+      # Cache the built dependencies
+      - uses: Swatinem/rust-cache@v2.2.1
+        with:
+          save-if: ${{ github.event_name == 'push' }}
+
+      # Build the WASM examples
+      - name: Build Aseprite 9 Slice example
+        run: cargo run --package run-wasm -- --release --build-only --example aseprite-9slice
+      - name: Build Aseprite Animation example
+        run: cargo run --package run-wasm -- --release --build-only --example aseprite-animation
+      - name: Build Smiley example
+        run: cargo run --package run-wasm -- --release --build-only --example smiley
+
+      # Deploy to GitHub pages
+      - name: Deploy to GitHub Pages
+        uses: s0/git-publish-subdir-action@master
+        env:
+          REPO: self
+          BRANCH: gh-pages
+          FOLDER: target/wasm-examples
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
