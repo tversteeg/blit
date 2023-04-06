@@ -5,10 +5,10 @@ const SIZE: usize = 1000;
 const ITERATIONS: i32 = 10;
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let img_rgb = image::open("examples/smiley_rgb.png").unwrap();
-    let rgb = img_rgb.as_rgb8().unwrap();
-    let img_rgba = image::open("examples/smiley_rgba.png").unwrap();
-    let rgba = img_rgba.as_rgba8().unwrap();
+    let rgb = image::open("examples/smiley_rgb.png").unwrap().into_rgb8();
+    let rgba = image::open("examples/smiley_rgba.png")
+        .unwrap()
+        .into_rgba8();
 
     let blit = rgb.to_blit_buffer_with_mask_color(0xFF_00_FF);
     let size = blit.size();
