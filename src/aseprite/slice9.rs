@@ -1,34 +1,36 @@
-use std::error::Error;
-
 use aseprite::SpritesheetData;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::BlitBuffer;
+use crate::{error::Result, BlitBuffer};
 
 /// `BlitBuffer` with extra information for rendering as a scalable slice 9 graphic.
 ///
 /// The slice information for scaling it should be exported in the output JSON from aseprite.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
-pub struct AnimationBlitBuffer {
+pub struct Slice9BlitBuffer {
+    /// Full image.
     buffer: BlitBuffer,
-    info: SpritesheetData,
+    /// X position of both vertical slices.
+    vertical_slices: (i32, i32),
+    /// Y position of both horizontal slices.
+    horizontal_slices: (i32, i32),
 }
 
-impl AnimationBlitBuffer {
+impl Slice9BlitBuffer {
     /// Construct a new buffer for animating a spritesheet.
     pub fn new(buffer: BlitBuffer, info: SpritesheetData) -> Self {
-        AnimationBlitBuffer { buffer, info }
+        todo!()
     }
 
     /// Draw the current frame using the animation info.
     pub fn blit(
         &self,
-        _dst: &mut [u32],
-        _dst_width: usize,
-        _offset: (i32, i32),
-    ) -> Result<(), Box<dyn Error>> {
+        dst: &mut [u32],
+        dst_width: usize,
+        (offset_x, offset_y, width, height): (i32, i32, i32, i32),
+    ) {
         todo!()
     }
 }

@@ -1,16 +1,15 @@
+use blit::{aseprite::Slice9BlitBuffer, BlitBuffer, BlitExt};
+
 use aseprite::SpritesheetData;
-use blit::{Animation, AnimationBlitBuffer, BlitBuffer, BlitExt};
 use image::GenericImageView;
 use softbuffer::GraphicsContext;
-
-use web_time::SystemTime;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::WindowBuilder,
 };
 
-// Backrgound color for the buffer
+// Background color for the buffer
 const BACKGROUND_COLOR: u32 = 0xFF_FF_CC_FF;
 
 /// Load an aseprite generated spritesheet.
@@ -37,11 +36,12 @@ fn main() {
     // The pixel buffer to fill
     let mut buffer: Vec<u32> = Vec::new();
 
-    // Create the animation buffer object
+    // Create the 9 slice buffer object
     let (blit_buf, info) = load_aseprite_image(
         include_bytes!("./button-9slice.png"),
         include_str!("./button-9slice.json"),
     );
+    let slice9 = Slice9BlitBuffer::new(blit_buf, info);
 
     // Setup a winit window
     let event_loop = EventLoop::new();
@@ -53,40 +53,52 @@ fn main() {
 
     let mut graphics_context = unsafe { GraphicsContext::new(&window, &window) }.unwrap();
 
-    // Keep track of the mouse position
-    let mut mouse_pos = (0, 0);
+    // Width of the canvas
+    let mut width = 0;
 
     // Keep track of how long each frame takes to render
-    let mut time = SystemTime::now();
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
         match event {
             Event::RedrawRequested(window_id) if window_id == window.id() => {
-                let width = window.inner_size().width as usize;
+                width = window.inner_size().width as usize;
                 let height = window.inner_size().height as usize;
 
                 // Resize the buffer when needed
                 if buffer.len() != width * height {
                     log::info!("Buffer resized to {width}x{height}, redrawing");
 
+                    // Clear the buffer before redrawing
+                    buffer.fill(BACKGROUND_COLOR);
+
                     // Resize the buffer with empty colors
                     buffer.resize(width * height, BACKGROUND_COLOR);
+
+                    // Blit the 9 slice pane with the size set by the cursor
+                    slice9.blit(
+                        &mut buffer,
+                        width,
+                        (10, 10, (width - 20) as i32, (height - 20) as i32),
+                    );
                 }
 
-                // Clear the buffer
-                buffer.fill(BACKGROUND_COLOR);
-
                 graphics_context.set_buffer(&buffer, width as u16, height as u16);
-
-                time = SystemTime::now();
             }
             Event::WindowEvent {
                 event: WindowEvent::CursorMoved { position, .. },
                 window_id,
                 ..
             } if window_id == window.id() => {
-                mouse_pos.0 = position.x as i32;
-                mouse_pos.1 = position.y as i32;
+                // Clear the buffer before redrawing
+                buffer.fill(BACKGROUND_COLOR);
+
+                // Blit the 9 slice pane with the size set by the cursor
+                slice9.blit(
+                    &mut buffer,
+                    width,
+                    (0, 0, position.x as i32, position.y as i32),
+                );
+
                 window.request_redraw();
             }
             Event::WindowEvent {

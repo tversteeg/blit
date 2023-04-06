@@ -1,5 +1,8 @@
 use aseprite::SpritesheetData;
-use blit::{Animation, AnimationBlitBuffer, BlitBuffer, BlitExt};
+use blit::{
+    aseprite::{Animation, AnimationBlitBuffer},
+    BlitBuffer, BlitExt,
+};
 use image::GenericImageView;
 use softbuffer::GraphicsContext;
 
@@ -99,24 +102,14 @@ fn main() {
                     .unwrap();
 
                 // Render the frames
-                anim_buffer
-                    .blit(&mut buffer, width, (4, 4), &walk_anim)
-                    .unwrap();
-                anim_buffer
-                    .blit(&mut buffer, width, (36, 4), &jump_anim)
-                    .unwrap();
-                anim_buffer
-                    .blit(&mut buffer, width, (68, 4), &run_anim)
-                    .unwrap();
-                anim_buffer
-                    .blit(&mut buffer, width, (4, 68), &full_anim)
-                    .unwrap();
+                anim_buffer.blit(&mut buffer, width, (4, 4), &walk_anim);
+                anim_buffer.blit(&mut buffer, width, (36, 4), &jump_anim);
+                anim_buffer.blit(&mut buffer, width, (68, 4), &run_anim);
+                anim_buffer.blit(&mut buffer, width, (4, 68), &full_anim);
 
                 // Draw all the frames separately
                 for i in 0..11 {
-                    anim_buffer
-                        .blit_frame(&mut buffer, width, (32 * i + 4, 36), i as usize)
-                        .unwrap();
+                    anim_buffer.blit_frame(&mut buffer, width, (32 * i + 4, 36), i as usize);
                 }
 
                 graphics_context.set_buffer(&buffer, width as u16, height as u16);

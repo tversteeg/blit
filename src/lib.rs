@@ -29,20 +29,17 @@
 //! # }}
 //! ```
 
+#[cfg(feature = "aseprite")]
+pub mod aseprite;
+pub mod error;
+#[cfg(feature = "image")]
+pub mod image;
+
 use std::ops::Range;
 
 use palette::{rgb::channels::Argb, Packed};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-
-#[cfg(feature = "image")]
-pub mod image_feature;
-#[cfg(feature = "image")]
-pub use image_feature::*;
-#[cfg(feature = "aseprite")]
-pub mod aseprite_feature;
-#[cfg(feature = "aseprite")]
-pub use aseprite_feature::*;
 
 /// Internal representation of a color.
 type Color = u32;

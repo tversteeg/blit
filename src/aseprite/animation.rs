@@ -1,10 +1,13 @@
-use std::{error::Error, time::Duration};
+use std::time::Duration;
 
 use aseprite::SpritesheetData;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::{aseprite_feature::AnimationError, BlitBuffer};
+use crate::{
+    error::{Error, Result},
+    BlitBuffer,
+};
 
 /// The animation status as returned by the `update` function of the `Animation` struct.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -39,27 +42,22 @@ impl Animation {
     }
 
     /// Start an animation with a range as described matching with a tag in the aseprite metadata.
-    pub fn start_from_tag(
-        buffer: &AnimationBlitBuffer,
-        tag: String,
-        repeat: bool,
-    ) -> Result<Self, AnimationError> {
-        let frame_tags = match buffer.info.meta.frame_tags {
-            Some(ref t) => t,
-            None => return Err(AnimationError::NoFrameTagsInMetadata),
-        };
-
-        for frame in frame_tags {
-            if tag == frame.name {
-                return Ok(Animation::start(
-                    frame.from as usize,
-                    frame.to as usize,
-                    repeat,
-                ));
-            }
-        }
-
-        Err(AnimationError::NoMatchingTag)
+    pub fn start_from_tag(buffer: &AnimationBlitBuffer, tag: String, repeat: bool) -> Result<Self> {
+        // Get the frame tags from the asesprite spritesheet info or throw an error when it doesn't exist
+        buffer
+            .info
+            .meta
+            .frame_tags
+            .as_ref()
+            .ok_or(Error::NoFrameTagsInMetadata)?
+            // Find the frame matching the name
+            .iter()
+            .find(|frame_tag| frame_tag.name == tag)
+            // Convert the frame to our animation struct
+            .map(|frame_tag| {
+                Animation::start(frame_tag.from as usize, frame_tag.to as usize, repeat)
+            })
+            .ok_or(Error::NoMatchingFrameTag(tag))
     }
 
     /// Update the animation with the time and set the current frame to the correct one.
@@ -67,17 +65,21 @@ impl Animation {
         &mut self,
         buffer: &AnimationBlitBuffer,
         dt: Duration,
-    ) -> Result<AnimationStatus, Box<dyn Error>> {
+    ) -> Result<AnimationStatus> {
         // If the animation is not repeating and already passed the end point return it as stopped.
         if !self.repeat && self.frame_current > self.frame_end {
             return Ok(AnimationStatus::Stopped);
         }
 
         // Convert dt to seconds
-        self.duration += dt.as_secs() as f64 + dt.subsec_nanos() as f64 * 1e-9;
+        self.duration += dt.as_secs_f64();
 
         // Get the current frame metadata
-        let mut frame = &buffer.info.frames[self.frame_current];
+        let mut frame = buffer
+            .info
+            .frames
+            .get(self.frame_current)
+            .ok_or(Error::FrameOutOfBounds(self.frame_current))?;
 
         // Loop through the frames if the time is passed
         while self.duration > frame.duration as f64 / 1000.0 {
@@ -123,13 +125,7 @@ impl AnimationBlitBuffer {
     }
 
     /// Draw one frame from the animation.
-    pub fn blit_frame(
-        &self,
-        dst: &mut [u32],
-        dst_width: usize,
-        offset: (i32, i32),
-        frame: usize,
-    ) -> Result<(), Box<dyn Error>> {
+    pub fn blit_frame(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), frame: usize) {
         let frame = &self.info.frames[frame];
 
         let rect = (
@@ -139,18 +135,10 @@ impl AnimationBlitBuffer {
             frame.frame.h as i32,
         );
         self.buffer.blit_rect(dst, dst_width, offset, rect);
-
-        Ok(())
     }
 
     /// Draw the current frame using the animation info.
-    pub fn blit(
-        &self,
-        dst: &mut [u32],
-        dst_width: usize,
-        offset: (i32, i32),
-        info: &Animation,
-    ) -> Result<(), Box<dyn Error>> {
-        self.blit_frame(dst, dst_width, offset, info.frame_current)
+    pub fn blit(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), info: &Animation) {
+        self.blit_frame(dst, dst_width, offset, info.frame_current);
     }
 }
