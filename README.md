@@ -12,7 +12,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-blit = "0.6"
+blit = "0.7"
 ```
 
 ## Demos
@@ -65,7 +65,7 @@ Uses the `["image"]` feature flag:
 
 ```toml
 [dependencies]
-blit = { version = "0.6", features = ["image"] }
+blit = { version = "0.7", features = ["image"] }
 ```
 
 ```rust
