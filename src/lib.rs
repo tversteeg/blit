@@ -202,6 +202,16 @@ impl BlitBuffer {
         self.height
     }
 
+    /// Get a reference to the pixel data.
+    pub fn pixels(&self) -> &[u32] {
+        &self.data
+    }
+
+    /// Get a mutable reference to the pixel data.
+    pub fn pixels_mut(&mut self) -> &mut [u32] {
+        &mut self.data
+    }
+
     /// Blit a horizontal strip.
     fn blit_horizontal(&self, dst: &mut [u32], dst_index: Range<usize>, blit_index: Range<usize>) {
         // Same size iterators over both our buffer and the output buffer
