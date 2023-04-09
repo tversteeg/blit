@@ -27,7 +27,7 @@ serde = ["dep:serde", "palette/serializing"]
 [dependencies]
 serde = { version = "1.0.159", optional = true, features = ["derive"] }
 num-traits = "0.2.15"
-aseprite = { version = "0.1.3", optional = true }
+aseprite = { optional = true, git = "https://github.com/ggez/aseprite" }
 palette = "0.6.1"
 thiserror = "1.0.40"
 
@@ -44,6 +44,8 @@ softbuffer = "0.2.0"
 winit = "0.28.3"
 log = "0.4.17"
 web-time = "0.2.0"
+pixels = "0.12.0"
+bytemuck = "1.13.1"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 criterion = "0.4.0"

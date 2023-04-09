@@ -2,15 +2,18 @@ use blit::{aseprite::Slice9BlitBuffer, BlitBuffer, BlitExt};
 
 use aseprite::SpritesheetData;
 use image::GenericImageView;
-use softbuffer::GraphicsContext;
+use pixels::{wgpu::TextureFormat, PixelsBuilder, SurfaceTexture};
+
 use winit::{
+    dpi::LogicalSize,
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::WindowBuilder,
 };
 
-// Background color for the buffer
-const BACKGROUND_COLOR: u32 = 0xFF_FF_CC_FF;
+// Window settings
+const WIDTH: usize = 300;
+const HEIGHT: usize = 200;
 
 /// Load an aseprite generated spritesheet.
 fn load_aseprite_image(img_bytes: &[u8], json: &str) -> (BlitBuffer, SpritesheetData) {
@@ -33,74 +36,81 @@ fn load_aseprite_image(img_bytes: &[u8], json: &str) -> (BlitBuffer, Spritesheet
 }
 
 fn main() {
-    // The pixel buffer to fill
-    let mut buffer: Vec<u32> = Vec::new();
-
     // Create the 9 slice buffer object
     let (blit_buf, info) = load_aseprite_image(
         include_bytes!("./button-9slice.png"),
         include_str!("./button-9slice.json"),
     );
-    let slice9 = Slice9BlitBuffer::new(blit_buf, info);
+    let slice9 = Slice9BlitBuffer::new(blit_buf, info).unwrap();
 
     // Setup a winit window
     let event_loop = EventLoop::new();
-    let window = WindowBuilder::new().build(&event_loop).unwrap();
+    let size = LogicalSize::new(WIDTH as f64, HEIGHT as f64);
+    let window = WindowBuilder::new()
+        .with_inner_size(size)
+        .with_min_inner_size(size)
+        .build(&event_loop)
+        .unwrap();
+    let mut pixels = {
+        let surface_texture = SurfaceTexture::new(WIDTH as u32, HEIGHT as u32, &window);
+        PixelsBuilder::new(WIDTH as u32, HEIGHT as u32, surface_texture)
+            .clear_color(pixels::wgpu::Color {
+                r: 1.0,
+                g: 0.8,
+                b: 1.0,
+                a: 1.0,
+            })
+            .texture_format(TextureFormat::Bgra8UnormSrgb)
+            .build()
+    }
+    .unwrap();
 
     // Setup the WASM canvas if running on the browser
     #[cfg(target_arch = "wasm32")]
     wasm::setup_canvas(&window);
 
-    let mut graphics_context = unsafe { GraphicsContext::new(&window, &window) }.unwrap();
-
-    // Width of the canvas
-    let mut width = 0;
+    // Cursor position
+    let mut mouse = (0, 0);
 
     // Keep track of how long each frame takes to render
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
         match event {
+            // Redraw the pixel buffer
             Event::RedrawRequested(window_id) if window_id == window.id() => {
-                width = window.inner_size().width as usize;
-                let height = window.inner_size().height as usize;
+                // Clear the buffer
+                pixels.frame_mut().fill(0);
 
-                // Resize the buffer when needed
-                if buffer.len() != width * height {
-                    log::info!("Buffer resized to {width}x{height}, redrawing");
+                // Blit the 9 slice pane with the size set by the cursor
+                slice9.blit(
+                    bytemuck::cast_slice_mut(pixels.frame_mut()),
+                    WIDTH,
+                    (5, 5, mouse.0 - 5, mouse.1 - 5),
+                );
 
-                    // Clear the buffer before redrawing
-                    buffer.fill(BACKGROUND_COLOR);
-
-                    // Resize the buffer with empty colors
-                    buffer.resize(width * height, BACKGROUND_COLOR);
-
-                    // Blit the 9 slice pane with the size set by the cursor
-                    slice9.blit(
-                        &mut buffer,
-                        width,
-                        (10, 10, (width - 20) as i32, (height - 20) as i32),
-                    );
-                }
-
-                graphics_context.set_buffer(&buffer, width as u16, height as u16);
+                pixels.render().unwrap();
             }
+            // Handle the mouse cursor movement
             Event::WindowEvent {
                 event: WindowEvent::CursorMoved { position, .. },
                 window_id,
                 ..
             } if window_id == window.id() => {
-                // Clear the buffer before redrawing
-                buffer.fill(BACKGROUND_COLOR);
-
-                // Blit the 9 slice pane with the size set by the cursor
-                slice9.blit(
-                    &mut buffer,
-                    width,
-                    (0, 0, position.x as i32, position.y as i32),
-                );
-
-                window.request_redraw();
+                // Update the mouse position
+                let mouse_pos = pixels
+                    .window_pos_to_pixel((position.x as f32, position.y as f32))
+                    .unwrap_or_default();
+                mouse.0 = mouse_pos.0 as i32;
+                mouse.1 = mouse_pos.1 as i32;
             }
+            // Resize the window
+            Event::WindowEvent {
+                event: WindowEvent::Resized(size),
+                window_id,
+            } if window_id == window.id() => {
+                pixels.resize_surface(size.width, size.height).unwrap();
+            }
+            // Close the window
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 window_id,
@@ -109,6 +119,9 @@ fn main() {
             }
             _ => {}
         }
+
+        // Draw another frame
+        window.request_redraw();
     });
 }
 

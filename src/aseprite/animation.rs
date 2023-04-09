@@ -48,8 +48,6 @@ impl Animation {
             .info
             .meta
             .frame_tags
-            .as_ref()
-            .ok_or(Error::NoFrameTagsInMetadata)?
             // Find the frame matching the name
             .iter()
             .find(|frame_tag| frame_tag.name == tag)
