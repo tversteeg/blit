@@ -1,12 +1,14 @@
-use blit::*;
+use blit::BlitExt;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 const SIZE: usize = 1000;
 const ITERATIONS: i32 = 10;
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let rgb = image::open("examples/smiley_rgb.png").unwrap().into_rgb8();
-    let rgba = image::open("examples/smiley_rgba.png")
+    let rgb = image::load_from_memory(include_bytes!("../examples/smiley/smiley_rgb.png"))
+        .unwrap()
+        .into_rgb8();
+    let rgba = image::load_from_memory(include_bytes!("../examples/smiley/smiley_rgba.png"))
         .unwrap()
         .into_rgba8();
 
