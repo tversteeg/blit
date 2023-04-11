@@ -25,7 +25,7 @@ aseprite = ["dep:aseprite"]
 serde = ["dep:serde", "palette/serializing"]
 
 [dependencies]
-serde = { version = "1.0.159", optional = true, features = ["derive"] }
+serde = { version = "1.0.160", optional = true, features = ["derive"] }
 num-traits = "0.2.15"
 aseprite = { optional = true, git = "https://github.com/ggez/aseprite" }
 palette = "0.6.1"
