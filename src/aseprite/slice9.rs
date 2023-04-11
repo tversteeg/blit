@@ -53,7 +53,18 @@ impl Slice9BlitBuffer {
         dst_width: usize,
         (offset_x, offset_y, width, height): (i32, i32, i32, i32),
     ) {
-        let size = Vec2::new(width, height);
+        // If the requested size is smaller or equal to our buffer size just render the whole buffer
+        if width <= self.buffer.width() && height <= self.buffer.height() {
+            self.buffer.blit(dst, dst_width, (offset_x, offset_y));
+
+            return;
+        }
+
+        // The size can't be smaller than our image
+        let size = Vec2::new(
+            width.max(self.buffer.width()),
+            height.max(self.buffer.height()),
+        );
 
         let top_left = Vec2::new(offset_x, offset_y);
         let top_left_inset = Vec2::new(
@@ -61,17 +72,17 @@ impl Slice9BlitBuffer {
             top_left.y + self.horizontal_slices.0,
         )
         .clamp(size);
-        let bottom_right = Vec2::new(offset_x + width, offset_y + height);
-        let bottom_right_inset = Vec2::new(
-            bottom_right.x - self.vertical_slices.1,
-            bottom_right.y - self.horizontal_slices.0,
-        )
-        .clamp(size);
 
+        let bottom_right = Vec2::new(offset_x + size.x, offset_y + size.y);
         let bottom_right_size = Vec2::new(
             self.buffer.width() - self.vertical_slices.1,
             self.buffer.height() - self.horizontal_slices.1,
         );
+        let bottom_right_inset = Vec2::new(
+            bottom_right.x - bottom_right_size.x,
+            bottom_right.y - bottom_right_size.y,
+        )
+        .clamp(size);
 
         // Top left corner
         self.buffer.blit_rect(
@@ -134,13 +145,89 @@ impl Slice9BlitBuffer {
             div_up(inset.y, middle_size.y),
         );
 
+        // Position where the remainders should start on the bottom right
+        let remainder = Vec2::new(
+            top_left_inset.x + (sections.x - 1) * middle_size.x,
+            top_left_inset.y + (sections.y - 1) * middle_size.y,
+        );
+        // Size of the remaining pieces
+        let remainder_size = Vec2::new(
+            bottom_right_inset.x - remainder.x,
+            bottom_right_inset.y - remainder.y,
+        );
+
+        // Blit top row remainder
+        self.buffer.blit_rect(
+            dst,
+            dst_width,
+            (remainder.x, top_left.y),
+            (
+                self.vertical_slices.0,
+                0,
+                remainder_size.x,
+                self.horizontal_slices.0,
+            ),
+        );
+
+        // Blit bottom row remainder
+        self.buffer.blit_rect(
+            dst,
+            dst_width,
+            (remainder.x, bottom_right_inset.y),
+            (
+                self.vertical_slices.0,
+                self.horizontal_slices.1,
+                remainder_size.x,
+                bottom_right_size.y,
+            ),
+        );
+
+        // Blit left row remainder
+        self.buffer.blit_rect(
+            dst,
+            dst_width,
+            (top_left.x, remainder.y),
+            (
+                0,
+                self.horizontal_slices.0,
+                self.vertical_slices.0,
+                remainder_size.y,
+            ),
+        );
+
+        // Blit right row remainder
+        self.buffer.blit_rect(
+            dst,
+            dst_width,
+            (bottom_right_inset.x, remainder.y),
+            (
+                self.vertical_slices.1,
+                self.horizontal_slices.0,
+                bottom_right_size.x,
+                remainder_size.y,
+            ),
+        );
+
+        // Blit center remainder
+        self.buffer.blit_rect(
+            dst,
+            dst_width,
+            (remainder.x, remainder.y),
+            (
+                self.vertical_slices.0,
+                self.horizontal_slices.0,
+                remainder_size.x,
+                remainder_size.y,
+            ),
+        );
+
         // Blit center and the top and bottom rows
-        for section_x in 0..sections.x {
-            let x = self.vertical_slices.0 + section_x * middle_size.x;
+        for section_x in 0..(sections.x - 1) {
+            let x = top_left_inset.x + section_x * middle_size.x;
 
             // Blit center
-            for section_y in 0..sections.y {
-                let y = self.horizontal_slices.0 + section_y * middle_size.y;
+            for section_y in 0..(sections.y - 1) {
+                let y = top_left_inset.y + section_y * middle_size.y;
 
                 self.buffer.blit_rect(
                     dst,
@@ -180,11 +267,24 @@ impl Slice9BlitBuffer {
                     bottom_right_size.y,
                 ),
             );
+
+            // Blit center horizontal remainder
+            self.buffer.blit_rect(
+                dst,
+                dst_width,
+                (x, remainder.y),
+                (
+                    self.vertical_slices.0,
+                    self.horizontal_slices.1,
+                    middle_size.x,
+                    remainder_size.y,
+                ),
+            );
         }
 
         // Blit left and right rows
-        for section_y in 0..sections.y {
-            let y = self.horizontal_slices.0 + section_y * middle_size.y;
+        for section_y in 0..(sections.y - 1) {
+            let y = top_left_inset.y + section_y * middle_size.y;
 
             // Blit left row
             self.buffer.blit_rect(
@@ -208,6 +308,19 @@ impl Slice9BlitBuffer {
                     self.vertical_slices.1,
                     self.horizontal_slices.0,
                     bottom_right_size.x,
+                    middle_size.y,
+                ),
+            );
+
+            // Blit center vertical remainder
+            self.buffer.blit_rect(
+                dst,
+                dst_width,
+                (remainder.x, y),
+                (
+                    self.vertical_slices.1,
+                    self.horizontal_slices.0,
+                    remainder_size.x,
                     middle_size.y,
                 ),
             );
