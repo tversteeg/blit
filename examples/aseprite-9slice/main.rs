@@ -25,7 +25,6 @@ fn load_aseprite_image(img_bytes: &[u8], json: &str) -> (BlitBuffer, Spritesheet
     let blit_buf = img.into_rgba8().to_blit_buffer_with_alpha(127);
 
     // Open the spritesheet info
-    log::info!("{}", &json);
     let info: SpritesheetData = serde_json::from_str(json).unwrap();
     log::info!(
         "Loaded spritesheet JSON data with {} frames",
@@ -35,7 +34,7 @@ fn load_aseprite_image(img_bytes: &[u8], json: &str) -> (BlitBuffer, Spritesheet
     (blit_buf, info)
 }
 
-fn main() {
+async fn run() {
     // Create the 9 slice buffer object
     let (blit_buf, info) = load_aseprite_image(
         include_bytes!("./button-9slice.png"),
@@ -51,6 +50,11 @@ fn main() {
         .with_min_inner_size(size)
         .build(&event_loop)
         .unwrap();
+
+    // Setup the WASM canvas if running on the browser
+    #[cfg(target_arch = "wasm32")]
+    wasm::setup_canvas(&window);
+
     let mut pixels = {
         let surface_texture = SurfaceTexture::new(WIDTH as u32, HEIGHT as u32, &window);
         PixelsBuilder::new(WIDTH as u32, HEIGHT as u32, surface_texture)
@@ -61,13 +65,10 @@ fn main() {
                 a: 1.0,
             })
             .texture_format(TextureFormat::Bgra8UnormSrgb)
-            .build()
+            .build_async()
+            .await
     }
     .unwrap();
-
-    // Setup the WASM canvas if running on the browser
-    #[cfg(target_arch = "wasm32")]
-    wasm::setup_canvas(&window);
 
     // Cursor position
     let mut mouse = (0, 0);
@@ -88,7 +89,9 @@ fn main() {
                     (5, 5, mouse.0 - 5, mouse.1 - 5),
                 );
 
-                pixels.render().unwrap();
+                if let Err(err) = pixels.render() {
+                    log::error!("Pixels error:\n{err}");
+                }
             }
             // Handle the mouse cursor movement
             Event::WindowEvent {
@@ -102,6 +105,9 @@ fn main() {
                     .unwrap_or_default();
                 mouse.0 = mouse_pos.0 as i32;
                 mouse.1 = mouse_pos.1 as i32;
+
+                // Draw another frame
+                window.request_redraw();
             }
             // Resize the window
             Event::WindowEvent {
@@ -109,6 +115,9 @@ fn main() {
                 window_id,
             } if window_id == window.id() => {
                 pixels.resize_surface(size.width, size.height).unwrap();
+
+                // Draw another frame
+                window.request_redraw();
             }
             // Close the window
             Event::WindowEvent {
@@ -119,10 +128,18 @@ fn main() {
             }
             _ => {}
         }
-
-        // Draw another frame
-        window.request_redraw();
     });
+}
+
+fn main() {
+    #[cfg(target_arch = "wasm32")]
+    {
+        wasm_bindgen_futures::spawn_local(run());
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        pollster::block_on(run());
+    }
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -133,7 +150,7 @@ mod wasm {
     /// Run main on the browser.
     #[wasm_bindgen(start)]
     pub fn run() {
-        console_log::init_with_level(log::Level::Debug).expect("error initializing logger");
+        console_log::init_with_level(log::Level::Info).expect("error initializing logger");
 
         super::main();
     }
