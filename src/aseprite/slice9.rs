@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     error::{Error, Result},
-    BlitBuffer,
+    Blit, BlitBuffer,
 };
 
 /// `BlitBuffer` with extra information for rendering as a scalable slice 9 graphic.
@@ -45,9 +45,10 @@ impl Slice9BlitBuffer {
             horizontal_slices,
         })
     }
+}
 
-    /// Draw the current frame using the animation info.
-    pub fn blit(
+impl Blit for Slice9BlitBuffer {
+    fn blit_area(
         &self,
         dst: &mut [u32],
         dst_width: usize,
@@ -60,18 +61,19 @@ impl Slice9BlitBuffer {
             return;
         }
 
-        // The size can't be smaller than our image
+        let dst_height = dst.len() / dst_width;
+
+        // The size can't be smaller than the source or bigger than the target
         let size = Vec2::new(
-            width.max(self.buffer.width()),
-            height.max(self.buffer.height()),
+            width.max(self.buffer.width()).clamp(0, dst_width as i32),
+            height.max(self.buffer.height()).clamp(0, dst_height as i32),
         );
 
         let top_left = Vec2::new(offset_x, offset_y);
         let top_left_inset = Vec2::new(
             top_left.x + self.vertical_slices.0,
             top_left.y + self.horizontal_slices.0,
-        )
-        .clamp(size);
+        );
 
         let bottom_right = Vec2::new(offset_x + size.x, offset_y + size.y);
         let bottom_right_size = Vec2::new(
@@ -81,11 +83,10 @@ impl Slice9BlitBuffer {
         let bottom_right_inset = Vec2::new(
             bottom_right.x - bottom_right_size.x,
             bottom_right.y - bottom_right_size.y,
-        )
-        .clamp(size);
+        );
 
         // Top left corner
-        self.buffer.blit_rect(
+        self.buffer.blit_subrect(
             dst,
             dst_width,
             top_left.as_tuple(),
@@ -93,7 +94,7 @@ impl Slice9BlitBuffer {
         );
 
         // Top right corner
-        self.buffer.blit_rect(
+        self.buffer.blit_subrect(
             dst,
             dst_width,
             (bottom_right_inset.x, top_left.y),
@@ -106,7 +107,7 @@ impl Slice9BlitBuffer {
         );
 
         // Bottom left corner
-        self.buffer.blit_rect(
+        self.buffer.blit_subrect(
             dst,
             dst_width,
             (top_left.x, bottom_right_inset.y),
@@ -119,7 +120,186 @@ impl Slice9BlitBuffer {
         );
 
         // Bottom right corner
-        self.buffer.blit_rect(
+        self.buffer.blit_subrect(
+            dst,
+            dst_width,
+            bottom_right_inset.as_tuple(),
+            (
+                self.vertical_slices.1,
+                self.horizontal_slices.1,
+                bottom_right_size.x,
+                bottom_right_size.y,
+            ),
+        );
+
+        // Area in the center we need to draw
+        let inset = bottom_right_inset - top_left_inset;
+
+        let middle_size = Vec2::new(
+            self.vertical_slices.1 - self.vertical_slices.0,
+            self.horizontal_slices.1 - self.horizontal_slices.0,
+        );
+
+        // Blit top row
+        self.buffer.blit_area_subrect(
+            dst,
+            dst_width,
+            (
+                top_left_inset.x,
+                top_left.y,
+                inset.x,
+                self.horizontal_slices.0,
+            ),
+            (
+                self.vertical_slices.0,
+                0,
+                middle_size.x,
+                self.horizontal_slices.0,
+            ),
+        );
+
+        // Blit left column
+        self.buffer.blit_area_subrect(
+            dst,
+            dst_width,
+            (
+                top_left.x,
+                top_left_inset.y,
+                self.vertical_slices.0,
+                inset.y,
+            ),
+            (
+                0,
+                self.horizontal_slices.0,
+                self.vertical_slices.0,
+                middle_size.y,
+            ),
+        );
+
+        // Blit bottom row
+        self.buffer.blit_area_subrect(
+            dst,
+            dst_width,
+            (
+                top_left_inset.x,
+                bottom_right_inset.y,
+                inset.x,
+                bottom_right_size.y,
+            ),
+            (
+                self.vertical_slices.0,
+                self.horizontal_slices.1,
+                middle_size.x,
+                bottom_right_size.y,
+            ),
+        );
+
+        // Blit right column
+        self.buffer.blit_area_subrect(
+            dst,
+            dst_width,
+            (
+                bottom_right_inset.x,
+                top_left_inset.y,
+                bottom_right_size.x,
+                inset.y,
+            ),
+            (
+                self.vertical_slices.1,
+                self.horizontal_slices.0,
+                bottom_right_size.x,
+                middle_size.y,
+            ),
+        );
+
+        // Blit center
+        self.buffer.blit_area_subrect(
+            dst,
+            dst_width,
+            (top_left_inset.x, top_left_inset.y, inset.x, inset.y),
+            (
+                self.vertical_slices.0,
+                self.horizontal_slices.0,
+                middle_size.x,
+                middle_size.y,
+            ),
+        )
+    }
+
+    fn blit_area_subrect(
+        &self,
+        dst: &mut [u32],
+        dst_width: usize,
+        (offset_x, offset_y, width, height): (i32, i32, i32, i32),
+        sub_rect: (i32, i32, i32, i32),
+    ) {
+        // If the requested size is smaller or equal to our buffer size just render the whole buffer
+        if width <= self.buffer.width() && height <= self.buffer.height() {
+            self.buffer.blit(dst, dst_width, (offset_x, offset_y));
+
+            return;
+        }
+
+        let dst_height = dst.len() / dst_width;
+
+        // The size can't be smaller than the source or bigger than the target
+        let size = Vec2::new(
+            width.max(self.buffer.width()).clamp(0, dst_width as i32),
+            height.max(self.buffer.height()).clamp(0, dst_height as i32),
+        );
+
+        let top_left = Vec2::new(offset_x, offset_y);
+        let top_left_inset = Vec2::new(
+            top_left.x + self.vertical_slices.0,
+            top_left.y + self.horizontal_slices.0,
+        );
+
+        let bottom_right = Vec2::new(offset_x + size.x, offset_y + size.y);
+        let bottom_right_size = Vec2::new(
+            self.buffer.width() - self.vertical_slices.1,
+            self.buffer.height() - self.horizontal_slices.1,
+        );
+        let bottom_right_inset = Vec2::new(
+            bottom_right.x - bottom_right_size.x,
+            bottom_right.y - bottom_right_size.y,
+        );
+
+        // Top left corner
+        self.buffer.blit_subrect(
+            dst,
+            dst_width,
+            top_left.as_tuple(),
+            (0, 0, self.vertical_slices.0, self.horizontal_slices.0),
+        );
+
+        // Top right corner
+        self.buffer.blit_subrect(
+            dst,
+            dst_width,
+            (bottom_right_inset.x, top_left.y),
+            (
+                self.vertical_slices.1,
+                0,
+                bottom_right_size.x,
+                self.horizontal_slices.0,
+            ),
+        );
+
+        // Bottom left corner
+        self.buffer.blit_subrect(
+            dst,
+            dst_width,
+            (top_left.x, bottom_right_inset.y),
+            (
+                0,
+                self.horizontal_slices.1,
+                self.vertical_slices.0,
+                bottom_right_size.y,
+            ),
+        );
+
+        // Bottom right corner
+        self.buffer.blit_subrect(
             dst,
             dst_width,
             bottom_right_inset.as_tuple(),
@@ -157,7 +337,7 @@ impl Slice9BlitBuffer {
         );
 
         // Blit top row remainder
-        self.buffer.blit_rect(
+        self.buffer.blit_subrect(
             dst,
             dst_width,
             (remainder.x, top_left.y),
@@ -170,7 +350,7 @@ impl Slice9BlitBuffer {
         );
 
         // Blit bottom row remainder
-        self.buffer.blit_rect(
+        self.buffer.blit_subrect(
             dst,
             dst_width,
             (remainder.x, bottom_right_inset.y),
@@ -183,7 +363,7 @@ impl Slice9BlitBuffer {
         );
 
         // Blit left row remainder
-        self.buffer.blit_rect(
+        self.buffer.blit_subrect(
             dst,
             dst_width,
             (top_left.x, remainder.y),
@@ -196,7 +376,7 @@ impl Slice9BlitBuffer {
         );
 
         // Blit right row remainder
-        self.buffer.blit_rect(
+        self.buffer.blit_subrect(
             dst,
             dst_width,
             (bottom_right_inset.x, remainder.y),
@@ -209,7 +389,7 @@ impl Slice9BlitBuffer {
         );
 
         // Blit center remainder
-        self.buffer.blit_rect(
+        self.buffer.blit_subrect(
             dst,
             dst_width,
             (remainder.x, remainder.y),
@@ -229,7 +409,7 @@ impl Slice9BlitBuffer {
             for section_y in 0..(sections.y - 1) {
                 let y = top_left_inset.y + section_y * middle_size.y;
 
-                self.buffer.blit_rect(
+                self.buffer.blit_subrect(
                     dst,
                     dst_width,
                     (x, y),
@@ -243,7 +423,7 @@ impl Slice9BlitBuffer {
             }
 
             // Blit top row
-            self.buffer.blit_rect(
+            self.buffer.blit_subrect(
                 dst,
                 dst_width,
                 (x, top_left.y),
@@ -256,7 +436,7 @@ impl Slice9BlitBuffer {
             );
 
             // Blit bottom row
-            self.buffer.blit_rect(
+            self.buffer.blit_subrect(
                 dst,
                 dst_width,
                 (x, bottom_right_inset.y),
@@ -269,7 +449,7 @@ impl Slice9BlitBuffer {
             );
 
             // Blit center horizontal remainder
-            self.buffer.blit_rect(
+            self.buffer.blit_subrect(
                 dst,
                 dst_width,
                 (x, remainder.y),
@@ -287,7 +467,7 @@ impl Slice9BlitBuffer {
             let y = top_left_inset.y + section_y * middle_size.y;
 
             // Blit left row
-            self.buffer.blit_rect(
+            self.buffer.blit_subrect(
                 dst,
                 dst_width,
                 (top_left.x, y),
@@ -300,7 +480,7 @@ impl Slice9BlitBuffer {
             );
 
             // Blit right row
-            self.buffer.blit_rect(
+            self.buffer.blit_subrect(
                 dst,
                 dst_width,
                 (bottom_right_inset.x, y),
@@ -313,7 +493,7 @@ impl Slice9BlitBuffer {
             );
 
             // Blit center vertical remainder
-            self.buffer.blit_rect(
+            self.buffer.blit_subrect(
                 dst,
                 dst_width,
                 (remainder.x, y),
@@ -325,6 +505,10 @@ impl Slice9BlitBuffer {
                 ),
             );
         }
+    }
+
+    fn size(&self) -> (i32, i32) {
+        self.buffer.size()
     }
 }
 
@@ -344,14 +528,6 @@ impl Vec2 {
     /// Convert to tuple.
     pub fn as_tuple(&self) -> (i32, i32) {
         (self.x, self.y)
-    }
-
-    /// Clamp to 0, 0 and the size passed.
-    pub fn clamp(self, bounds: Vec2) -> Self {
-        Self {
-            x: self.x.min(bounds.x).max(0),
-            y: self.y.min(bounds.y).max(0),
-        }
     }
 }
 

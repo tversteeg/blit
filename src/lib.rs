@@ -6,7 +6,7 @@
 //!
 //! ```
 //! # #[cfg(feature = "image")] mod test {
-//! use blit::BlitExt;
+//! use blit::{Blit, BlitExt};
 //!
 //! const WIDTH: usize = 180;
 //! const HEIGHT: usize = 180;
@@ -58,6 +58,77 @@ pub trait BlitExt {
     fn to_blit_buffer_with_mask_color<C>(&self, mask_color: C) -> BlitBuffer
     where
         C: Into<Packed<Argb>>;
+}
+
+/// Blit functions that can be called from multiple places.
+pub trait Blit {
+    /// Width and height of the source buffer in pixels.
+    ///
+    /// Changes depending on the state, for example with an animation it's the size of the current frame.
+    ///
+    /// This must be implemented so the other blit functions won't have to be implemented manually every time.
+    fn size(&self) -> (i32, i32);
+
+    /// Blit the image on a buffer.
+    ///
+    /// The complete image will be rendered, only clipped by the edges of the buffer size.
+    fn blit(&self, dst: &mut [u32], dst_width: usize, (offset_x, offset_y): (i32, i32)) {
+        let (width, height) = self.size();
+
+        // We can blit the subrectangle with our entire size, effectively blitting everything
+        self.blit_area(dst, dst_width, (offset_x, offset_y, width, height))
+    }
+
+    /// Blit a section of the image on a buffer.
+    ///
+    /// The sub rectangle is the section of the source that will be rendered.
+    /// Its values are (X, Y, Width, Height) in pixels.
+    /// A good mental model to keep for the section is that it's a view on the blit buffer that will be rendered.
+    fn blit_subrect(
+        &self,
+        dst: &mut [u32],
+        dst_width: usize,
+        (offset_x, offset_y): (i32, i32),
+        sub_rect: (i32, i32, i32, i32),
+    ) {
+        let (_, _, sub_width, sub_height) = sub_rect;
+
+        self.blit_area_subrect(
+            dst,
+            dst_width,
+            (offset_x, offset_y, sub_width, sub_height),
+            sub_rect,
+        )
+    }
+
+    /// Blit in a specific area on a buffer.
+    ///
+    /// The sub rectangle is the section of the target that will be rendered.
+    /// Its values are (X, Y, Width, Height) in pixels.
+    ///
+    /// For most types this will render a tiled view, for [`aseprite::Slice9BlitBuffer`] this will stretch the slices.
+    fn blit_area(&self, dst: &mut [u32], dst_width: usize, area: (i32, i32, i32, i32)) {
+        let (width, height) = self.size();
+
+        // We can blit the sub rectangle but it's our entire size
+        self.blit_area_subrect(dst, dst_width, area, (0, 0, width, height));
+    }
+
+    /// Blit a section of the image in a specific target area on buffer.
+    ///
+    /// The sub rectangle is the section of the target that will be rendered.
+    /// Its values are (X, Y, Width, Height) in pixels.
+    /// The sub rectangle is the section of the target that will be rendered.
+    /// Its values are (X, Y, Width, Height) in pixels.
+    ///
+    /// For most types this will render a tiled view, for [`aseprite::Slice9BlitBuffer`] this will stretch the slices.
+    fn blit_area_subrect(
+        &self,
+        dst: &mut [u32],
+        dst_width: usize,
+        area: (i32, i32, i32, i32),
+        sub_rect: (i32, i32, i32, i32),
+    );
 }
 
 /// A data structure holding a color and a mask buffer to make blitting on a buffer real fast.
@@ -114,54 +185,54 @@ impl BlitBuffer {
         }
     }
 
-    /// Blit the image on a buffer using bitwise operations.
-    pub fn blit(&self, dst: &mut [u32], dst_width: usize, (offset_x, offset_y): (i32, i32)) {
-        let dst_height = dst.len() / dst_width;
-
-        let dst_width_i32 = dst_width as i32;
-        let dst_height_i32 = dst_height as i32;
-
-        // If the sizes match and the buffers are aligned we don't have to do any special bounds checks
-        if (offset_x, offset_y) == (0, 0)
-            && (dst_width_i32, dst_height_i32) == (self.width, self.height)
-        {
-            // Due to there being no bound overlap since the dimensions are exactly the same we can treat this case like a single contiguous horizontal strip
-            self.blit_horizontal(dst, 0..dst.len(), 0..self.data.len());
-
-            return;
-        }
-
-        // We can blit the sub rectangle but it's our entire size
-        self.blit_rect(
-            dst,
-            dst_width,
-            (offset_x, offset_y),
-            (0, 0, self.width, self.height),
-        )
+    /// Get the width of the buffer in pixels.
+    pub fn width(&self) -> i32 {
+        self.width
     }
 
-    /// Blit a section of the image on a buffer.
-    ///
-    /// The sub rectangle is the section of the source that will be rendered.
-    /// Its values are (X, Y, Width, Height) in pixels.
-    /// A good mental model to keep for the section is that it's a view on the blit buffer that will be rendered.
-    pub fn blit_rect(
+    /// Get the height of the buffer in pixels.
+    pub fn height(&self) -> i32 {
+        self.height
+    }
+
+    /// Get a reference to the pixel data.
+    pub fn pixels(&self) -> &[u32] {
+        &self.data
+    }
+
+    /// Get a mutable reference to the pixel data.
+    pub fn pixels_mut(&mut self) -> &mut [u32] {
+        &mut self.data
+    }
+
+    /// Blit a sub rectangle clipped by an external rectangle.
+    fn blit_clipped(
         &self,
         dst: &mut [u32],
         dst_width: usize,
         (offset_x, offset_y): (i32, i32),
         (sub_rect_x, sub_rect_y, sub_rect_width, sub_rect_height): (i32, i32, i32, i32),
+        (external_x, external_y, external_width, external_height): (i32, i32, i32, i32),
     ) {
         let dst_height = dst.len() / dst_width;
 
         let dst_width_i32 = dst_width as i32;
         let dst_height_i32 = dst_height as i32;
 
+        // Ignore out of bounds images
+        if offset_x > dst_width_i32 || offset_y > dst_height_i32 {
+            return;
+        }
+
         // Region we need to draw in
-        let dst_start_x = offset_x.max(0);
-        let dst_start_y = offset_y.max(0);
-        let dst_end_x = (offset_x + sub_rect_width).min(dst_width_i32) as usize;
-        let dst_end_y = (offset_y + sub_rect_height).min(dst_height_i32) as usize;
+        let dst_start_x = offset_x.max(external_x).max(0);
+        let dst_start_y = offset_y.max(external_y).max(0);
+        let dst_end_x = (offset_x + sub_rect_width)
+            .min(dst_width_i32)
+            .min(external_x + external_width) as usize;
+        let dst_end_y = (offset_y + sub_rect_height)
+            .min(dst_height_i32)
+            .min(external_y + external_height) as usize;
         let dst_start_x_usize = dst_start_x as usize;
         let dst_start_y_usize = dst_start_y as usize;
 
@@ -185,31 +256,6 @@ impl BlitBuffer {
             // Blit the horizontal slice
             self.blit_horizontal(dst, dst_start_x..dst_end_x, blit_start_x..blit_end_x);
         }
-    }
-
-    /// Get the size of the buffer in pixels.
-    pub fn size(&self) -> (i32, i32) {
-        (self.width, self.height)
-    }
-
-    /// Get the width of the buffer in pixels.
-    pub fn width(&self) -> i32 {
-        self.width
-    }
-
-    /// Get the height of the buffer in pixels.
-    pub fn height(&self) -> i32 {
-        self.height
-    }
-
-    /// Get a reference to the pixel data.
-    pub fn pixels(&self) -> &[u32] {
-        &self.data
-    }
-
-    /// Get a mutable reference to the pixel data.
-    pub fn pixels_mut(&mut self) -> &mut [u32] {
-        &mut self.data
     }
 
     /// Blit a horizontal strip.
@@ -237,6 +283,83 @@ impl BlitBuffer {
             // Pixel from the blit buffer is maskde, use the original color
             dst_pixel
         }
+    }
+}
+
+impl Blit for BlitBuffer {
+    fn blit(&self, dst: &mut [u32], dst_width: usize, (offset_x, offset_y): (i32, i32)) {
+        let dst_height = dst.len() / dst_width;
+
+        let dst_width_i32 = dst_width as i32;
+        let dst_height_i32 = dst_height as i32;
+
+        // If the sizes match and the buffers are aligned we don't have to do any special bounds checks
+        if (offset_x, offset_y) == (0, 0)
+            && (dst_width_i32, dst_height_i32) == (self.width, self.height)
+        {
+            // Due to there being no bound overlap since the dimensions are exactly the same we can treat this case like a single contiguous horizontal strip
+            self.blit_horizontal(dst, 0..dst.len(), 0..self.data.len());
+
+            return;
+        }
+
+        // We can blit the sub rectangle but it's our entire size
+        self.blit_subrect(
+            dst,
+            dst_width,
+            (offset_x, offset_y),
+            (0, 0, self.width, self.height),
+        )
+    }
+
+    fn blit_area_subrect(
+        &self,
+        dst: &mut [u32],
+        dst_width: usize,
+        area: (i32, i32, i32, i32),
+        sub_rect: (i32, i32, i32, i32),
+    ) {
+        let (area_x, area_y, area_width, area_height) = area;
+        let (_sub_x, _sub_y, sub_width, sub_height) = sub_rect;
+
+        // How much items we need to draw completely
+        let full_x = area_width / sub_width;
+        let full_y = area_height / sub_height;
+
+        // What remaining part of the image we need to draw
+        let remainder_x = area_x + full_x * sub_width;
+        let remainder_y = area_y + full_y * sub_height;
+
+        for y in 0..full_y {
+            // Position on the buffer to render this image
+            let target_y = area_y + y * sub_height;
+
+            for x in 0..full_x {
+                // Position on the buffer to render this image
+                let target_x = area_x + x * sub_width;
+
+                // Blit the completely filled rectangles
+                self.blit_clipped(dst, dst_width, (target_x, target_y), sub_rect, area);
+            }
+
+            // Blit the vertical remainders
+            self.blit_clipped(dst, dst_width, (remainder_x, target_y), sub_rect, area);
+        }
+
+        for x in 0..full_x {
+            // Position on the buffer to render this image
+            let target_x = area_x + x * sub_width;
+
+            // Blit the horizontal remainders
+            self.blit_clipped(dst, dst_width, (target_x, remainder_y), sub_rect, area);
+        }
+
+        // Blit the single corner remainder
+        self.blit_clipped(dst, dst_width, (remainder_x, remainder_y), sub_rect, area);
+    }
+
+    fn size(&self) -> (i32, i32) {
+        (self.width, self.height)
     }
 }
 

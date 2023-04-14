@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     error::{Error, Result},
-    BlitBuffer,
+    Blit, BlitBuffer,
 };
 
 /// The animation status as returned by the `update` function of the `Animation` struct.
@@ -114,29 +114,90 @@ impl Animation {
 pub struct AnimationBlitBuffer {
     buffer: BlitBuffer,
     info: SpritesheetData,
+    /// Current frame to render.
+    frame: usize,
 }
 
 impl AnimationBlitBuffer {
     /// Construct a new buffer for animating a spritesheet.
     pub fn new(buffer: BlitBuffer, info: SpritesheetData) -> Self {
-        AnimationBlitBuffer { buffer, info }
+        AnimationBlitBuffer {
+            buffer,
+            info,
+            frame: 0,
+        }
     }
 
-    /// Draw one frame from the animation.
-    pub fn blit_frame(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), frame: usize) {
-        let frame = &self.info.frames[frame];
+    /// Update which frame to render from the [`Animation`] struct.
+    pub fn update(&mut self, animation: &Animation) {
+        self.frame = animation.frame_current;
+    }
 
-        let rect = (
+    /// Update to a specific frame to render.
+    pub fn set_frame(&mut self, frame: usize) {
+        self.frame = frame;
+    }
+}
+
+impl Blit for AnimationBlitBuffer {
+    fn blit_area_subrect(
+        &self,
+        dst: &mut [u32],
+        dst_width: usize,
+        area: (i32, i32, i32, i32),
+        sub_rect: (i32, i32, i32, i32),
+    ) {
+        let frame = &self.info.frames[self.frame];
+
+        // Area in the source to which this frame belongs
+        let frame_subrect = (
             frame.frame.x as i32,
             frame.frame.y as i32,
             frame.frame.w as i32,
             frame.frame.h as i32,
         );
-        self.buffer.blit_rect(dst, dst_width, offset, rect);
+
+        // Get a subrect of the frame subrect
+        let sub_rect = subrect_from_rect(frame_subrect, sub_rect);
+
+        self.buffer
+            .blit_area_subrect(dst, dst_width, area, sub_rect);
     }
 
-    /// Draw the current frame using the animation info.
-    pub fn blit(&self, dst: &mut [u32], dst_width: usize, offset: (i32, i32), info: &Animation) {
-        self.blit_frame(dst, dst_width, offset, info.frame_current);
+    /// Size depends on the size of the current frame.
+    fn size(&self) -> (i32, i32) {
+        let frame = &self.info.frames[self.frame];
+
+        (frame.frame.w as i32, frame.frame.h as i32)
     }
+}
+
+/// Take the sub rectangle from a rectangle.
+fn subrect_from_rect(
+    (rect_x, rect_y, rect_width, rect_height): (i32, i32, i32, i32),
+    (subrect_x, subrect_y, subrect_width, subrect_height): (i32, i32, i32, i32),
+) -> (i32, i32, i32, i32) {
+    debug_assert!(rect_x >= 0);
+    debug_assert!(rect_y >= 0);
+    debug_assert!(rect_width >= 0);
+    debug_assert!(rect_height >= 0);
+    debug_assert!(subrect_x >= 0);
+    debug_assert!(subrect_y >= 0);
+    debug_assert!(subrect_width >= 0);
+    debug_assert!(subrect_height >= 0);
+
+    let rect_edge_x = rect_x + rect_width;
+    let rect_edge_y = rect_y + rect_height;
+
+    let subrect_x = rect_x + subrect_x;
+    let subrect_y = rect_y + subrect_y;
+    let subrect_edge_x = subrect_x + subrect_width;
+    let subrect_edge_y = subrect_y + subrect_height;
+
+    let x = rect_x.max(subrect_x);
+    let y = rect_y.max(subrect_y);
+    let edge_x = rect_edge_x.min(subrect_edge_x);
+    let edge_y = rect_edge_y.min(subrect_edge_y);
+
+    (x, y, edge_x - x, edge_y - y)
 }

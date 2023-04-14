@@ -1,7 +1,7 @@
 use aseprite::SpritesheetData;
 use blit::{
     aseprite::{Animation, AnimationBlitBuffer},
-    BlitBuffer, BlitExt,
+    Blit, BlitBuffer, BlitExt,
 };
 use image::GenericImageView;
 use softbuffer::GraphicsContext;
@@ -48,7 +48,7 @@ fn main() {
         include_bytes!("./king-by-buch.png"),
         include_str!("./king-by-buch.json"),
     );
-    let anim_buffer = AnimationBlitBuffer::new(anim_blit_buf, anim_info);
+    let mut anim_buffer = AnimationBlitBuffer::new(anim_blit_buf, anim_info);
 
     // Create the animations using hardcoded frames
     let mut walk_anim = Animation::start(0, 3, true);
@@ -88,28 +88,35 @@ fn main() {
                 // Clear the buffer
                 buffer.fill(BACKGROUND_COLOR);
 
+                // Update the animations and render the frames
                 walk_anim
                     .update(&anim_buffer, time.elapsed().unwrap())
                     .unwrap();
+                anim_buffer.update(&walk_anim);
+                anim_buffer.blit(&mut buffer, width, (4, 4));
+
                 jump_anim
                     .update(&anim_buffer, time.elapsed().unwrap())
                     .unwrap();
+                anim_buffer.update(&jump_anim);
+                anim_buffer.blit(&mut buffer, width, (36, 4));
+
                 run_anim
                     .update(&anim_buffer, time.elapsed().unwrap())
                     .unwrap();
+                anim_buffer.update(&run_anim);
+                anim_buffer.blit(&mut buffer, width, (68, 4));
+
                 full_anim
                     .update(&anim_buffer, time.elapsed().unwrap())
                     .unwrap();
-
-                // Render the frames
-                anim_buffer.blit(&mut buffer, width, (4, 4), &walk_anim);
-                anim_buffer.blit(&mut buffer, width, (36, 4), &jump_anim);
-                anim_buffer.blit(&mut buffer, width, (68, 4), &run_anim);
-                anim_buffer.blit(&mut buffer, width, (4, 68), &full_anim);
+                anim_buffer.update(&full_anim);
+                anim_buffer.blit(&mut buffer, width, (4, 68));
 
                 // Draw all the frames separately
                 for i in 0..11 {
-                    anim_buffer.blit_frame(&mut buffer, width, (32 * i + 4, 36), i as usize);
+                    anim_buffer.set_frame(i);
+                    anim_buffer.blit(&mut buffer, width, (32 * i as i32 + 4, 36));
                 }
 
                 graphics_context.set_buffer(&buffer, width as u16, height as u16);

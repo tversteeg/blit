@@ -1,4 +1,4 @@
-use blit::{aseprite::Slice9BlitBuffer, BlitBuffer, BlitExt};
+use blit::{aseprite::Slice9BlitBuffer, Blit, BlitBuffer, BlitExt};
 
 use aseprite::SpritesheetData;
 use image::GenericImageView;
@@ -83,10 +83,23 @@ async fn run() {
                 pixels.frame_mut().fill(0);
 
                 // Blit the 9 slice pane with the size set by the cursor
-                slice9.blit(
+                slice9.blit_area(
                     bytemuck::cast_slice_mut(pixels.frame_mut()),
                     WIDTH,
                     (5, 5, mouse.0 - 5, mouse.1 - 5),
+                );
+
+                // Blit a sub rect of the 9 slice pane with the size set by the cursor
+                slice9.blit_area_subrect(
+                    bytemuck::cast_slice_mut(pixels.frame_mut()),
+                    WIDTH,
+                    (
+                        mouse.0,
+                        mouse.1,
+                        WIDTH as i32 - mouse.0 - 5,
+                        HEIGHT as i32 - mouse.1 - 5,
+                    ),
+                    (3, 3, slice9.size().0 - 6, slice9.size().1 - 6),
                 );
 
                 if let Err(err) = pixels.render() {

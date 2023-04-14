@@ -1,4 +1,4 @@
-use blit::{BlitBuffer, BlitExt};
+use blit::{Blit, BlitBuffer, BlitExt};
 use image::GenericImageView;
 use softbuffer::GraphicsContext;
 use winit::{
@@ -19,12 +19,11 @@ fn redraw(buffer: &mut [u32], rgb: &BlitBuffer, rgba: &BlitBuffer, width: usize)
 
     // Draw the images at full size
     rgba.blit(buffer, width, (0, 0));
-    rgb.blit(buffer, width, (rgb.width(), 0));
 
     let half_size = (rgb.width() / 2, rgb.height() / 2);
 
     // Draw the left half
-    rgb.blit_rect(
+    rgb.blit_subrect(
         buffer,
         width,
         (0, rgb.height()),
@@ -32,11 +31,41 @@ fn redraw(buffer: &mut [u32], rgb: &BlitBuffer, rgba: &BlitBuffer, width: usize)
     );
 
     // Draw the bottom right part
-    rgb.blit_rect(
+    rgb.blit_subrect(
         buffer,
         width,
         (half_size.0, (rgb.height() + half_size.1)),
         (half_size.0, half_size.1, half_size.0, half_size.1),
+    );
+
+    // Draw it tiling
+    rgb.blit_area(
+        buffer,
+        width,
+        (
+            0,
+            rgb.height() * 2,
+            rgb.width() + half_size.0,
+            rgb.height() * 2 + half_size.1,
+        ),
+    );
+
+    // Draw a third part of it tiling
+    rgb.blit_area_subrect(
+        buffer,
+        width,
+        (
+            rgb.width() * 2,
+            0,
+            rgb.width() + half_size.0,
+            rgb.height() * 2 + half_size.1,
+        ),
+        (
+            rgb.width() / 3,
+            rgb.height() / 3,
+            rgb.width() / 3,
+            rgb.height() / 3,
+        ),
     );
 }
 

@@ -1,4 +1,4 @@
-use blit::BlitExt;
+use blit::{Blit, BlitExt};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 const SIZE: usize = 1000;
@@ -30,7 +30,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
         b.iter(|| {
             for x in 0..ITERATIONS {
-                blit.blit_rect(
+                blit.blit_subrect(
                     &mut buffer,
                     SIZE,
                     black_box((x * 100, 0)),
