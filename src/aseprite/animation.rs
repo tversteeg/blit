@@ -12,8 +12,11 @@ use crate::{
 /// The animation status as returned by the `update` function of the `Animation` struct.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum AnimationStatus {
+    /// Animation is playing and will start at the beginning when ending.
     Repeat,
+    /// Animation is playing and will stop at the end.
     Playing,
+    /// Animation isn't playing.
     Stopped,
 }
 
@@ -28,8 +31,7 @@ pub struct Animation {
 }
 
 impl Animation {
-    /// Start an animation with a frame range, the duration of each frame is described in the
-    /// aseprite metadata.
+    /// Start an animation with a frame range, the duration of each frame is described in the Aseprite metadata.
     pub fn start(frame_start: usize, frame_end: usize, repeat: bool) -> Self {
         Animation {
             frame_start,
@@ -41,7 +43,7 @@ impl Animation {
         }
     }
 
-    /// Start an animation with a range as described matching with a tag in the aseprite metadata.
+    /// Start an animation with a range as described matching with a tag in the Aseprite metadata.
     pub fn start_from_tag(buffer: &AnimationBlitBuffer, tag: String, repeat: bool) -> Result<Self> {
         // Get the frame tags from the asesprite spritesheet info or throw an error when it doesn't exist
         buffer

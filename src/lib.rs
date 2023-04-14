@@ -33,7 +33,18 @@
 pub mod aseprite;
 pub mod error;
 #[cfg(feature = "image")]
-pub mod image;
+mod image;
+
+/// Commonly used imports.
+///
+/// ```rust
+/// use blit::prelude::*;
+/// ```
+pub mod prelude {
+    #[cfg(feature = "image")]
+    pub use crate::BlitExt;
+    pub use crate::{Blit, BlitBuffer};
+}
 
 use std::ops::Range;
 
@@ -44,7 +55,9 @@ use serde::{Deserialize, Serialize};
 /// Internal representation of a color.
 type Color = u32;
 
-/// A trait adding blitting functions to image types.
+/// Add blitting functions to external image types.
+///
+/// Can be used to create a custom implementation if you want different image or other formats.
 pub trait BlitExt {
     /// Convert the image to a custom `BlitBuffer` type which is optimized for applying the blitting operations.
     ///

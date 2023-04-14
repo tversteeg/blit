@@ -9,7 +9,7 @@ use crate::{
     Blit, BlitBuffer,
 };
 
-/// `BlitBuffer` with extra information for rendering as a scalable slice 9 graphic.
+/// `BlitBuffer` with extra information for rendering as a scalable [9-slice graphic](https://en.wikipedia.org/wiki/9-slice_scaling).
 ///
 /// The slice information for scaling it should be exported in the output JSON from aseprite.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
