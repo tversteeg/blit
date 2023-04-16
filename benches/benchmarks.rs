@@ -1,4 +1,4 @@
-use blit::{Blit, BlitExt};
+use blit::{Blit, ToBlitBuffer};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 const SIZE: usize = 1000;

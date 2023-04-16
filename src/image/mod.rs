@@ -1,12 +1,13 @@
 use std::ops::Deref;
 
 use image::{ImageBuffer, Pixel};
+use imgref::ImgVec;
 use num_traits::ToPrimitive;
 use palette::{rgb::channels::Argb, Packed};
 
-use crate::{BlitBuffer, BlitExt, Color};
+use crate::{BlitBuffer, Color, ToBlitBuffer};
 
-impl<P, Container> BlitExt for ImageBuffer<P, Container>
+impl<P, Container> ToBlitBuffer for ImageBuffer<P, Container>
 where
     P: Pixel,
     Container: Deref<Target = [P::Subpixel]>,
@@ -57,6 +58,15 @@ where
             width as i32,
             alpha_treshold,
         )
+    }
+
+    fn to_img_with_mask_color<C>(&self, mask_color: C) -> ImgVec<u32>
+    where
+        C: Into<Packed<Argb>>,
+    {
+        let buf = self.to_blit_buffer_with_mask_color(mask_color);
+
+        ImgVec::new(buf.data, buf.width as usize, buf.height as usize)
     }
 }
 

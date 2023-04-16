@@ -1,7 +1,7 @@
 use aseprite::SpritesheetData;
 use blit::{
     aseprite::{Animation, AnimationBlitBuffer},
-    Blit, BlitBuffer, BlitExt,
+    Blit, BlitBuffer, ToBlitBuffer,
 };
 use image::GenericImageView;
 use softbuffer::GraphicsContext;

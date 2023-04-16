@@ -1,4 +1,4 @@
-use blit::{Blit, BlitBuffer, BlitExt};
+use blit::{Blit, BlitBuffer, ToBlitBuffer};
 use image::GenericImageView;
 use softbuffer::GraphicsContext;
 use winit::{
@@ -7,10 +7,10 @@ use winit::{
     window::WindowBuilder,
 };
 
-// Color in the source image that needs to be masked to alpha
+/// Color in the source image that needs to be masked to alpha.
 const MASK_COLOR: u32 = 0xFF_00_FF;
 
-// Backrgound color for the buffer
+/// Background color for the buffer.
 const BACKGROUND_COLOR: u32 = 0xFF_FF_CC_FF;
 
 /// Redraw the static images on the buffer.

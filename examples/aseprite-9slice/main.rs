@@ -1,4 +1,4 @@
-use blit::{aseprite::Slice9BlitBuffer, Blit, BlitBuffer, BlitExt};
+use blit::{aseprite::Slice9BlitBuffer, Blit, BlitBuffer, ToBlitBuffer};
 
 use aseprite::SpritesheetData;
 use image::GenericImageView;
