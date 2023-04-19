@@ -45,7 +45,7 @@ softbuffer = "0.2.0"
 winit = "0.28.3"
 log = "0.4.17"
 web-time = "0.2.0"
-pixels = "0.12.0"
+pixels = "0.12.1"
 bytemuck = "1.13.1"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]

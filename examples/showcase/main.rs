@@ -1,6 +1,5 @@
-use blit::{Blit, BlitBuffer, BlitOptions, ToBlitBuffer};
+use blit::{Blit, BlitOptions, ToBlitBuffer};
 
-use image::GenericImageView;
 use imgref::ImgVec;
 use pixels::{wgpu::TextureFormat, PixelsBuilder, SurfaceTexture};
 
@@ -22,8 +21,13 @@ const MASK_COLOR: u32 = 0xFF_00_FF;
 const CHAR_WIDTH: i32 = 9;
 const CHAR_HEIGHT: i32 = 10;
 
+/// Show the text for clicking.
+fn frame0(dst: &mut [u32], _buf: &ImgVec<u32>, font: &ImgVec<u32>, _mouse: (i32, i32)) {
+    draw_text(dst, font, 0, "Go to the next showcase item by clicking\nthe left mouse button.\n\nGo to the previous showcase item by\nclicking the right mouse button.");
+}
+
 /// Draw the sprite completely.
-fn frame1(dst: &mut [u32], buf: &ImgVec<u32>, font: &ImgVec<u32>) {
+fn frame1(dst: &mut [u32], buf: &ImgVec<u32>, font: &ImgVec<u32>, mouse: (i32, i32)) {
     let (center_x, center_y) = (WIDTH / 2 - buf.width() / 2, HEIGHT / 2 - buf.height() / 2);
 
     buf.blit_opt(
@@ -31,19 +35,20 @@ fn frame1(dst: &mut [u32], buf: &ImgVec<u32>, font: &ImgVec<u32>) {
         WIDTH,
         &BlitOptions::new((center_x as i32, center_y as i32)),
     );
+    buf.blit_opt(dst, WIDTH, &BlitOptions::new(mouse));
 
-    draw_text(dst, font, 0, "Single sprite without any clipping");
+    draw_text(dst, font, 0, "Blit the full sprite");
     draw_text(
         dst,
         font,
         HEIGHT as i32 - CHAR_WIDTH,
-        "BlitOptions::new((center_x, center_y))",
+        "BlitOptions::new(position)",
     );
 }
 
 /// Draw the left half of the sprite using the area option.
-fn frame2(dst: &mut [u32], buf: &ImgVec<u32>, font: &ImgVec<u32>) {
-    let (src_width, src_height) = (buf.width() as i32 / 2, buf.height() as i32);
+fn frame2(dst: &mut [u32], buf: &ImgVec<u32>, font: &ImgVec<u32>, mouse: (i32, i32)) {
+    let (src_width, src_height) = (buf.width() as i32, buf.height() as i32);
     let (center_x, center_y) = (
         WIDTH as i32 / 2 - src_width / 2,
         HEIGHT as i32 / 2 - src_height / 2,
@@ -52,30 +57,142 @@ fn frame2(dst: &mut [u32], buf: &ImgVec<u32>, font: &ImgVec<u32>) {
     buf.blit_opt(
         dst,
         WIDTH,
-        &BlitOptions::new((center_x, center_y)).with_area((src_width, src_height)),
+        &BlitOptions::new((center_x, center_y)).with_sub_rect((
+            0,
+            0,
+            (mouse.0 - center_x).clamp(1, src_width),
+            src_height,
+        )),
     );
+
     draw_text(
         dst,
         font,
         0,
-        "Single sprite with the width area\ndivided by two",
+        "Only show a part of the image by using\na smaller area",
     );
     draw_text(
         dst,
         font,
         HEIGHT as i32 - CHAR_HEIGHT * 2,
-        "BlitOptions::new((center_x, center_y)\n\t.with_area((width / 2, height))",
+        "BlitOptions::new(position)\n\t.with_area((mouse_x, height))",
     );
 }
 
-/// Draw the top half of the sprite two times by taking a sub rectangle from it.
-fn frame3(dst: &mut [u32], buf: &ImgVec<u32>, font: &ImgVec<u32>) {
+/// Draw the top half of the sprite by taking a sub rectangle from it.
+fn frame3(dst: &mut [u32], buf: &ImgVec<u32>, font: &ImgVec<u32>, mouse: (i32, i32)) {
     let (src_width, src_height) = (buf.width() as i32, buf.height() as i32);
+    let (center_x, center_y) = (
+        WIDTH as i32 / 2 - src_width / 2,
+        HEIGHT as i32 / 2 - src_height / 2,
+    );
 
     buf.blit_opt(
         dst,
         WIDTH,
-        &BlitOptions::new((5, 10)).with_sub_rect((0, 0, src_width, src_height / 2)),
+        &BlitOptions::new((center_x, center_y)).with_sub_rect((
+            0,
+            0,
+            src_width,
+            (mouse.1 - center_y).clamp(1, src_height),
+        )),
+    );
+
+    draw_text(
+        dst,
+        font,
+        0,
+        "Alternatively only show a part of the image\nby using a sub-rectangle",
+    );
+    draw_text(
+        dst,
+        font,
+        HEIGHT as i32 - CHAR_HEIGHT * 2,
+        "BlitOptions::new(position)\n\t.with_sub_rect((0, 0, width, mouse_y))",
+    );
+}
+
+/// Draw the middle section of the sprite by taking a sub rectangle from it.
+fn frame4(dst: &mut [u32], buf: &ImgVec<u32>, font: &ImgVec<u32>, mouse: (i32, i32)) {
+    let (src_width, src_height) = (buf.width() as i32 / 2, buf.height() as i32 / 2);
+    let (center_x, center_y) = (
+        WIDTH as i32 / 2 - src_width / 2,
+        HEIGHT as i32 / 2 - src_height / 2,
+    );
+
+    buf.blit_opt(
+        dst,
+        WIDTH,
+        &BlitOptions::new((center_x, center_y)).with_sub_rect((
+            (mouse.0 - center_x).clamp(0, src_width),
+            (mouse.1 - center_y).clamp(0, src_height),
+            src_width,
+            src_height,
+        )),
+    );
+
+    draw_text(
+        dst,
+        font,
+        0,
+        "Sub-rectangles can be used to draw any\npart of the sprite",
+    );
+    draw_text(
+        dst,
+        font,
+        HEIGHT as i32 - CHAR_HEIGHT * 4,
+        "BlitOptions::new(position)\n\t.with_sub_rect(\n\t\t(mouse_x, mouse_y, w/2, h/2)\n\t)",
+    );
+}
+
+/// Draw the full sprite tiled multiple times for each dimension.
+fn frame5(dst: &mut [u32], buf: &ImgVec<u32>, font: &ImgVec<u32>, mouse: (i32, i32)) {
+    let (offset_x, offset_y) = (20, 20);
+
+    buf.blit_opt(
+        dst,
+        WIDTH,
+        &BlitOptions::new((offset_x, offset_y))
+            .with_area(((mouse.0 - offset_x).max(1), (mouse.1 - offset_y).max(1))),
+    );
+
+    draw_text(
+        dst,
+        font,
+        0,
+        "Areas bigger than the sprite can be used\nfor tiling",
+    );
+    draw_text(
+        dst,
+        font,
+        HEIGHT as i32 - CHAR_HEIGHT * 2,
+        "BlitOptions::new(position)\n\t.with_area(mouse)",
+    );
+}
+
+/// Draw a sub-rectangle of the sprite tiled multiple times for each dimension.
+fn frame6(dst: &mut [u32], buf: &ImgVec<u32>, font: &ImgVec<u32>, mouse: (i32, i32)) {
+    let (offset_x, offset_y) = (20, 20);
+
+    buf.blit_opt(
+        dst,
+        WIDTH,
+        &BlitOptions::new((offset_x, offset_y))
+            .with_area(((mouse.0 - offset_x).max(1), (mouse.1 - offset_y).max(1)))
+            .with_sub_rect((0, 70, 34, 32)),
+    );
+
+    draw_text(
+        dst,
+        font,
+        0,
+        "Combining areas with sub-rectangles allows\nfor creating custom tiling patterns",
+    );
+    draw_text(
+        dst,
+        font,
+        HEIGHT as i32 - CHAR_HEIGHT * 3,
+        "BlitOptions::new(position)\n\t.with_area(mouse)\n\t.with_sub_rect((0, 70, 34, 32))",
     );
 }
 
@@ -88,7 +205,7 @@ fn draw_text(dst: &mut [u32], font: &ImgVec<u32>, mut y: i32, text: &str) {
     let mut x = 0;
 
     // Draw each character from the string
-    text.chars().enumerate().for_each(|(i, ch)| {
+    text.chars().for_each(|ch| {
         // Move the cursor
         x += CHAR_WIDTH;
 
@@ -166,7 +283,8 @@ async fn run() {
     let mut current_frame = 0;
 
     // All frame drawing functions, cycled by clicking
-    let frames: Vec<fn(&mut [u32], &ImgVec<u32>, &ImgVec<u32>)> = vec![frame1, frame2, frame3];
+    let frames: Vec<fn(&mut [u32], &ImgVec<u32>, &ImgVec<u32>, (i32, i32))> =
+        vec![frame0, frame1, frame2, frame3, frame4, frame5, frame6];
 
     // Keep track of how long each frame takes to render
     event_loop.run(move |event, _, control_flow| {
@@ -178,7 +296,12 @@ async fn run() {
                 pixels.frame_mut().fill(0);
 
                 // Convert the [u8] * 4 array of pixels to [u32] and draw the frame
-                frames[current_frame](bytemuck::cast_slice_mut(pixels.frame_mut()), &buf, &font);
+                frames[current_frame](
+                    bytemuck::cast_slice_mut(pixels.frame_mut()),
+                    &buf,
+                    &font,
+                    mouse,
+                );
 
                 if let Err(err) = pixels.render() {
                     log::error!("Pixels error:\n{err}");
@@ -189,17 +312,27 @@ async fn run() {
             Event::WindowEvent {
                 event:
                     WindowEvent::MouseInput {
-                        button: MouseButton::Left,
+                        button,
                         state: ElementState::Released,
                         ..
                     },
                 window_id,
                 ..
             } if window_id == window.id() => {
-                current_frame += 1;
-                // Wrap around
-                if current_frame >= frames.len() {
-                    current_frame = 0;
+                if button == MouseButton::Left {
+                    current_frame += 1;
+
+                    // Wrap around
+                    if current_frame >= frames.len() {
+                        current_frame = 0;
+                    }
+                } else if button == MouseButton::Right {
+                    // Wrap around
+                    if current_frame == 0 {
+                        current_frame = frames.len();
+                    }
+
+                    current_frame -= 1;
                 }
 
                 // Tell the window to redraw another frame

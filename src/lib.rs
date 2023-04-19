@@ -174,11 +174,7 @@ impl BlitOptions {
     where
         P: Into<(i32, i32)>,
     {
-        let (width, height) = area.into();
-        debug_assert!(width > 0);
-        debug_assert!(height > 0);
-
-        self.area = Some((width, height));
+        self.set_area(area);
 
         self
     }
@@ -193,17 +189,12 @@ impl BlitOptions {
     /// # Sets field(s)
     ///
     /// - [`BlitOptions::sub_rect`]
+    /// - [`BlitOptions::area`] to `(width, height)` if it's `None`
     pub fn with_sub_rect<P>(mut self, sub_rect: P) -> Self
     where
         P: Into<(i32, i32, i32, i32)>,
     {
-        let (x, y, width, height) = sub_rect.into();
-        debug_assert!(x >= 0);
-        debug_assert!(y >= 0);
-        debug_assert!(width > 0);
-        debug_assert!(height > 0);
-
-        self.sub_rect = Some((x, y, width, height));
+        self.set_sub_rect(sub_rect);
 
         self
     }
@@ -258,6 +249,35 @@ impl BlitOptions {
         self.area.unwrap_or(source_size.into())
     }
 
+    /// Set which part of the source buffer to render.
+    ///
+    /// - When `None` is used, `(0, 0, source_width, source_height)` is set instead.
+    /// - With `Some(..)`, the values in the tuple are `(x, y, width, height)`.
+    ///
+    /// This is similar to UV coordinates but instead of relative positions in the range of `0..1` this takes absolute positions in the range `0..width` for horizontal positions and `0..height` for vertical positions.
+    ///
+    /// # Sets field(s)
+    ///
+    /// - [`BlitOptions::sub_rect`]
+    /// - [`BlitOptions::area`] to `(width, height)` if it's `None`
+    pub fn set_sub_rect<P>(&mut self, sub_rect: P)
+    where
+        P: Into<(i32, i32, i32, i32)>,
+    {
+        let (x, y, width, height) = sub_rect.into();
+        debug_assert!(x >= 0);
+        debug_assert!(y >= 0);
+        debug_assert!(width > 0);
+        debug_assert!(height > 0);
+
+        self.sub_rect = Some((x, y, width, height));
+
+        // Don't tile the image when only the subrectangle is set
+        if self.area.is_none() {
+            self.area = Some((width, height));
+        }
+    }
+
     /// Get the source area sub rectangle `(x, y, width, height)`.
     ///
     /// - If [`BlitOptions::sub_rect`] is `None` the size of the source will be returned with `(0, 0)` as the position.
@@ -284,8 +304,31 @@ impl BlitOptions {
         (sub_rect_x, sub_rect_y, sub_rect_width, sub_rect_height)
     }
 
+    /// Set the size of the area `(width, height)` on the destination buffer.
+    ///
+    /// - When the area is smaller than the source buffer it effectively functions as the width and height parameters of [`BlitOptions::sub_rect`].
+    /// - When the area is bigger than the source buffer the default behaviour will be tiling.
+    ///
+    /// # Sets field(s)
+    ///
+    /// - [`BlitOptions::area`]
+    pub fn set_area<P>(&mut self, area: P)
+    where
+        P: Into<(i32, i32)>,
+    {
+        let (width, height) = area.into();
+        debug_assert!(width > 0);
+        debug_assert!(height > 0);
+
+        self.area = Some((width, height));
+    }
+
     /// Calculate the horizontal range of pixels on the destination buffer where the source buffer will be drawn.
-    pub fn target_horizontal_range(&self, src_width: usize, dst_width: usize) -> Range<usize> {
+    pub(crate) fn target_horizontal_range(
+        &self,
+        src_width: usize,
+        dst_width: usize,
+    ) -> Range<usize> {
         // The size the source wants to draw
         let width = match self.area {
             Some(area) => area.0,
@@ -393,10 +436,10 @@ impl Blit for ImgVec<u32> {
         todo!()
     }
 
-    fn blit_opt(&self, dst: &mut [u32], dst_width: usize, options: &BlitOptions) {
-        let dst_height = dst.len() / dst_width;
+    fn blit_opt(&self, dst_raw: &mut [u32], dst_width: usize, options: &BlitOptions) {
+        let dst_height = dst_raw.len() / dst_width;
         // Convert the destination to an image so we can take a sub image from it
-        let mut dst = ImgRefMut::new(dst, dst_width, dst_height);
+        let mut dst = ImgRefMut::new(dst_raw, dst_width, dst_height);
 
         let src_size = (self.width() as i32, self.height() as i32);
 
@@ -451,7 +494,63 @@ impl Blit for ImgVec<u32> {
         }
 
         // Draw the tiling
-        let x_tiles = width / sub_rect_width;
+        let (x_tiles, y_tiles) = (width / sub_rect_width, height / sub_rect_height);
+
+        // Draw the full tiles
+        let mut new_options = BlitOptions::default();
+        for y in 0..y_tiles {
+            for x in 0..x_tiles {
+                new_options.set_position((
+                    options.x + x * sub_rect_width,
+                    options.y + y * sub_rect_height,
+                ));
+
+                // Use the same sub rectangle for full tiles
+                new_options.set_sub_rect((sub_rect_x, sub_rect_y, sub_rect_width, sub_rect_height));
+
+                self.blit_opt(dst_raw, dst_width, &new_options);
+            }
+        }
+
+        // How many pixels that are not a full sprite we still need to draw
+        let (x_remainder, y_remainder) = (width % sub_rect_width, height % sub_rect_height);
+
+        // Draw the right remainders
+        if x_remainder > 0 {
+            for y in 0..y_tiles {
+                new_options.set_position((
+                    options.x + x_tiles * sub_rect_width,
+                    options.y + y * sub_rect_height,
+                ));
+                new_options.set_area((x_remainder, sub_rect_height));
+
+                self.blit_opt(dst_raw, dst_width, &new_options);
+            }
+        }
+
+        // Draw the bottom remainders
+        if y_remainder > 0 {
+            for x in 0..x_tiles {
+                new_options.set_position((
+                    options.x + x * sub_rect_width,
+                    options.y + y_tiles * sub_rect_height,
+                ));
+                new_options.set_area((sub_rect_width, y_remainder));
+
+                self.blit_opt(dst_raw, dst_width, &new_options);
+            }
+        }
+
+        // Draw the single remaining corner
+        if x_remainder > 0 && y_remainder > 0 {
+            new_options.set_position((
+                options.x + x_tiles * sub_rect_width,
+                options.y + y_tiles * sub_rect_height,
+            ));
+            new_options.set_area((x_remainder, y_remainder));
+
+            self.blit_opt(dst_raw, dst_width, &new_options);
+        }
     }
 }
 
