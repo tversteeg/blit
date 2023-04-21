@@ -13,7 +13,7 @@
 //!    vertical_slices: Some(Slice::ternary_middle(3, 6)),
 //!    horizontal_slices: Some(Slice::ternary_middle(3, 6)),
 //!    ..Default::default()
-//! }
+//! };
 //!
 //! // Although you probably want
 //! BlitOptions::slice9((x, y), 3, 6, 3, 6);

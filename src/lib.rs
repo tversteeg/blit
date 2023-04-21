@@ -6,7 +6,7 @@
 //!
 //! ```
 //! # #[cfg(feature = "image")] mod test {
-//! use blit::{Blit, BlitExt};
+//! use blit::{Blit, ToBlitBuffer};
 //!
 //! const WIDTH: usize = 180;
 //! const HEIGHT: usize = 180;
@@ -35,6 +35,7 @@ pub mod error;
 #[cfg(feature = "image")]
 mod image;
 pub mod slice;
+mod view;
 
 /// Commonly used imports.
 ///
@@ -54,6 +55,7 @@ use palette::{rgb::channels::Argb, Packed};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use slice::Slice;
+use view::ImageView;
 
 /// Internal representation of a color.
 type Color = u32;
@@ -99,7 +101,11 @@ pub struct BlitOptions {
     /// - When the area is bigger than the source buffer the default behaviour will be tiling.
     ///
     /// ```rust
-    /// assert_eq!(BlitOptions::default().with_area(10, 10), BlitOptions::default().with_subrect(0, 0, 10, 10));
+    /// # use blit::BlitOptions;
+    /// assert_eq!(
+    ///     BlitOptions::default().with_area((10, 10)).sub_rect((100, 100)),
+    ///     BlitOptions::default().with_sub_rect((0, 0, 10, 10)).sub_rect((100, 100))
+    /// );
     /// ```
     pub area: Option<(i32, i32)>,
 
@@ -322,28 +328,6 @@ impl BlitOptions {
 
         self.area = Some((width, height));
     }
-
-    /// Calculate the horizontal range of pixels on the destination buffer where the source buffer will be drawn.
-    pub(crate) fn target_horizontal_range(
-        &self,
-        src_width: usize,
-        dst_width: usize,
-    ) -> Range<usize> {
-        // The size the source wants to draw
-        let width = match self.area {
-            Some(area) => area.0,
-            None => src_width as i32,
-        };
-
-        let dst_width_i32 = dst_width as i32;
-
-        // We can't draw negative pixels
-        let dst_x_start = self.x.clamp(0, dst_width_i32);
-        // We also can't draw beyond the border
-        let dst_x_end = (self.x + width).clamp(0, dst_width_i32);
-
-        dst_x_start as usize..dst_x_end as usize
-    }
 }
 
 /// Blit functions that can be called from multiple places.
@@ -448,7 +432,11 @@ impl Blit for ImgVec<u32> {
         let dst_y = options.y.max(0);
 
         // Nothing to render when they fall outside of the screen
-        if dst_x >= dst_width as i32 || dst_y >= dst_height as i32 {
+        if options.x <= -src_size.0
+            || options.y <= -src_size.1
+            || dst_x >= dst_width as i32
+            || dst_y >= dst_height as i32
+        {
             return;
         }
 
@@ -688,6 +676,19 @@ impl BlitBuffer {
         }
     }
 
+    /*
+    /// Get an iterator of references slices for the sub image.
+    fn sub_image_iter(
+        &self,
+        (x, y, width, height): (i32, i32, i32, i32),
+    ) -> impl Iterator<Item = &[Color]> {
+        // If the sub image is out of bounds don't return it
+        if x <= -width || y <= -height || x > self.width || y > self.height {
+            return std::iter::empty();
+        }
+    }
+    */
+
     /// Blit a horizontal strip.
     fn blit_horizontal(&self, dst: &mut [u32], dst_index: Range<usize>, blit_index: Range<usize>) {
         // Same size iterators over both our buffer and the output buffer
@@ -698,6 +699,11 @@ impl BlitBuffer {
         dst_iter.zip(blit_iter).for_each(|(dst_pixel, blit_pixel)| {
             *dst_pixel = Self::blit_pixel(*dst_pixel, *blit_pixel);
         });
+    }
+
+    /// Get a horizontal view based on this whole image.
+    fn view(&self) -> ImageView {
+        ImageVie
     }
 
     /// Blit a single pixel.
@@ -790,6 +796,136 @@ impl Blit for BlitBuffer {
 
     fn size(&self) -> (i32, i32) {
         (self.width, self.height)
+    }
+
+    fn blit_opt(&self, dst_raw: &mut [u32], dst_width: usize, options: &BlitOptions) {
+        let dst_height = dst_raw.len() / dst_width;
+        // Convert the destination to view so we can calculate with it
+        let mut dst = match ImageView::new_unchecked((0, 0, dst_width, dst_height)) {
+            Some(view) => view,
+            None => return,
+        };
+
+        // Convert our source to a view
+        let mut src = match ImageView::new_unchecked((0, 0, dst_width, dst_height)) {
+            Some(view) => view,
+            None => return,
+        };
+
+        let src_size = (self.width() as i32, self.height() as i32);
+
+        let (width, height) = options.area(src_size);
+        let dst_x = options.x.max(0);
+        let dst_y = options.y.max(0);
+
+        // Nothing to render when they fall outside of the screen
+        if options.x <= -src_size.0
+            || options.y <= -src_size.1
+            || dst_x >= dst_width as i32
+            || dst_y >= dst_height as i32
+        {
+            return;
+        }
+
+        // Subtract the difference from the size so we won't draw too many pixels
+        let offset_x = dst_x - options.x;
+        let offset_y = dst_y - options.y;
+
+        let clamped_dst_width = (width - offset_x).clamp(0, dst_width as i32 - dst_x);
+        let clamped_dst_height = (height - offset_y).clamp(0, dst.height() as i32 - dst_y);
+
+        // Pixels on the destination we need to fill
+        let mut target_dst = dst.sub_image_mut(
+            dst_x as usize,
+            dst_y as usize,
+            clamped_dst_width as usize,
+            clamped_dst_height as usize,
+        );
+
+        // Get the sub rectangle of the source to draw
+        let (sub_rect_x, sub_rect_y, sub_rect_width, sub_rect_height) = options.sub_rect(src_size);
+
+        // If the target size matches the source size we don't have to worry about tiling
+        if width == sub_rect_width && height == sub_rect_height {
+            // Pixels on the source we need to fill
+            let sub_rect_x = sub_rect_x + offset_x;
+            let sub_rect_y = sub_rect_y + offset_y;
+
+            let target_src = self.sub_image(
+                sub_rect_x as usize,
+                sub_rect_y as usize,
+                clamped_dst_width as usize,
+                clamped_dst_height as usize,
+            );
+
+            target_dst
+                .pixels_mut()
+                .zip(target_src.pixels())
+                .for_each(|(dst_pixel, src_pixel)| {
+                    *dst_pixel = BlitBuffer::blit_pixel(*dst_pixel, src_pixel)
+                });
+
+            return;
+        }
+
+        // Draw the tiling
+        let (x_tiles, y_tiles) = (width / sub_rect_width, height / sub_rect_height);
+
+        // Draw the full tiles
+        let mut new_options = BlitOptions::default();
+        for y in 0..y_tiles {
+            for x in 0..x_tiles {
+                new_options.set_position((
+                    options.x + x * sub_rect_width,
+                    options.y + y * sub_rect_height,
+                ));
+
+                // Use the same sub rectangle for full tiles
+                new_options.set_sub_rect((sub_rect_x, sub_rect_y, sub_rect_width, sub_rect_height));
+
+                self.blit_opt(dst_raw, dst_width, &new_options);
+            }
+        }
+
+        // How many pixels that are not a full sprite we still need to draw
+        let (x_remainder, y_remainder) = (width % sub_rect_width, height % sub_rect_height);
+
+        // Draw the right remainders
+        if x_remainder > 0 {
+            for y in 0..y_tiles {
+                new_options.set_position((
+                    options.x + x_tiles * sub_rect_width,
+                    options.y + y * sub_rect_height,
+                ));
+                new_options.set_area((x_remainder, sub_rect_height));
+
+                self.blit_opt(dst_raw, dst_width, &new_options);
+            }
+        }
+
+        // Draw the bottom remainders
+        if y_remainder > 0 {
+            for x in 0..x_tiles {
+                new_options.set_position((
+                    options.x + x * sub_rect_width,
+                    options.y + y_tiles * sub_rect_height,
+                ));
+                new_options.set_area((sub_rect_width, y_remainder));
+
+                self.blit_opt(dst_raw, dst_width, &new_options);
+            }
+        }
+
+        // Draw the single remaining corner
+        if x_remainder > 0 && y_remainder > 0 {
+            new_options.set_position((
+                options.x + x_tiles * sub_rect_width,
+                options.y + y_tiles * sub_rect_height,
+            ));
+            new_options.set_area((x_remainder, y_remainder));
+
+            self.blit_opt(dst_raw, dst_width, &new_options);
+        }
     }
 }
 
