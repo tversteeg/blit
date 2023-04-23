@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     error::{Error, Result},
-    Blit, BlitBuffer,
+    Blit, BlitBuffer, BlitOptions, Size,
 };
 
 /// The animation status as returned by the `update` function of the `Animation` struct.
@@ -142,13 +142,7 @@ impl AnimationBlitBuffer {
 }
 
 impl Blit for AnimationBlitBuffer {
-    fn blit_area_subrect(
-        &self,
-        dst: &mut [u32],
-        dst_width: usize,
-        area: (i32, i32, i32, i32),
-        sub_rect: (i32, i32, i32, i32),
-    ) {
+    fn blit(&self, dst: &mut [u32], dst_size: Size, options: &BlitOptions) {
         let frame = &self.info.frames[self.frame];
 
         // Area in the source to which this frame belongs
@@ -159,18 +153,7 @@ impl Blit for AnimationBlitBuffer {
             frame.frame.h as i32,
         );
 
-        // Get a subrect of the frame subrect
-        let sub_rect = subrect_from_rect(frame_subrect, sub_rect);
-
-        self.buffer
-            .blit_area_subrect(dst, dst_width, area, sub_rect);
-    }
-
-    /// Size depends on the size of the current frame.
-    fn size(&self) -> (i32, i32) {
-        let frame = &self.info.frames[self.frame];
-
-        (frame.frame.w as i32, frame.frame.h as i32)
+        todo!()
     }
 }
 

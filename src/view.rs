@@ -1,116 +1,94 @@
-use std::{num::NonZeroUsize, ops::Range};
+use std::{
+    num::{NonZeroU32, NonZeroUsize},
+    ops::Range,
+};
+
+use num_traits::ToPrimitive;
+
+use crate::{
+    error::{Error, Result},
+    Size, SubRect,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ImageView {
-    /// Offset of the view on the original data.
-    offset: (i32, i32),
-    /// Size of the view on the data.
-    size: (NonZeroUsize, NonZeroUsize),
-}
+pub(crate) struct ImageView(SubRect);
 
 impl ImageView {
     /// Create a new view based on the size of the original buffer.
     ///
     /// When it's `None` the view doesn't contain any actual pixels.
-    pub fn new<P1, P2, S1, S2>(
-        (target_x, target_y, target_width, target_height): (P1, P1, S1, S1),
-        (parent_x, parent_y, parent_width, parent_height): (P2, P2, S2, S2),
-    ) -> Option<Self>
+    pub fn new<T, P>(target: T, parent: P) -> Option<Self>
     where
-        P1: TryInto<i32>,
-        P2: TryInto<i32>,
-        S1: TryInto<i32>,
-        S2: TryInto<i32>,
+        T: TryInto<SubRect>,
+        P: TryInto<SubRect>,
     {
         // Return `None` if any of the conversions failed
-        let (target_x, target_y, target_width, target_height) = match (
-            target_x.try_into(),
-            target_y.try_into(),
-            target_width.try_into(),
-            target_height.try_into(),
-        ) {
-            (Ok(x), Ok(y), Ok(w), Ok(h)) => (x, y, w, h),
-            _ => return None,
-        };
-        let (parent_x, parent_y, parent_width, parent_height) = match (
-            parent_x.try_into(),
-            parent_y.try_into(),
-            parent_width.try_into(),
-            parent_height.try_into(),
-        ) {
-            (Ok(x), Ok(y), Ok(w), Ok(h)) => (x, y, w, h),
+        let (target, parent) = match (target.try_into(), parent.try_into()) {
+            (Ok(target), Ok(parent)) => (target, parent),
             _ => return None,
         };
 
-        let (parent_right, parent_bottom) = (parent_x + parent_width, parent_y + parent_height);
+        let (parent_right, parent_bottom) = (parent.right(), parent.bottom());
 
         // No pixels will be drawn when the view taken is outside of the bounds of the original image
-        if target_x <= parent_x - target_width
-            || target_y <= parent_y - target_height
-            || target_x >= parent_right
-            || target_y >= parent_bottom
+        if target.x <= parent.x - target.width()
+            || target.y <= parent.y - target.height()
+            || target.x >= parent_right
+            || target.y >= parent_bottom
         {
             return None;
         }
 
         // Clip the target to the left and top side
-        let (offset_x, offset_y) = (target_x.max(parent_x), target_y.max(parent_x));
+        let (offset_x, offset_y) = (target.x.max(parent.x), target.y.max(parent.y));
 
         // How much pixels are subtracted from the left and top side by clipping
-        let (subtract_x, subtract_y) = (offset_x - target_x, offset_y - target_y);
+        let (subtract_x, subtract_y) = (offset_x - target.x, offset_y - target.y);
 
         // Clip the width and height to right and bottom side if applicable
         let (actual_width, actual_height) = (
-            (target_width - subtract_x).min(parent_right - target_x),
-            (target_height - subtract_y).min(parent_bottom - target_y),
+            (target.width() - subtract_x).min(parent_right - target.x),
+            (target.height() - subtract_y).min(parent_bottom - target.y),
         );
 
-        Self::new_unchecked((offset_x, offset_y, actual_width, actual_height))
+        Self::try_from((target.x, target.y, actual_width, actual_height)).ok()
     }
 
-    /// Create a new view that's not clipped by it's parent.
-    ///
-    /// This is faster when you're 100% sure it fits.
-    /// `width <= 0` and `height <= 0` will still be checked.
-    pub fn new_unchecked<P, S>(
-        (target_x, target_y, target_width, target_height): (P, P, S, S),
-    ) -> Option<Self>
-    where
-        P: TryInto<i32>,
-        S: TryInto<i32>,
-    {
-        let (target_x, target_y, target_width, target_height) = match (
-            target_x.try_into(),
-            target_y.try_into(),
-            target_width.try_into(),
-            target_height.try_into(),
-        ) {
-            (Ok(x), Ok(y), Ok(w), Ok(h)) => (x, y, w, h),
-            _ => return None,
-        };
-
-        // No pixels will be drawn when the size is smaller than 0
-        if target_width <= 0 || target_height <= 0 {
-            return None;
-        }
-
-        // SAFETY: due to to above call this can never be zero or smaller
-        let target_width = unsafe { NonZeroUsize::new_unchecked(target_width as usize) };
-        let target_height = unsafe { NonZeroUsize::new_unchecked(target_height as usize) };
-
-        let offset = (target_x, target_y);
-        let size = (target_width, target_height);
-
-        Some(Self { offset, size })
+    /// Create a full view of a complete buffer.
+    pub fn full(size: Size) -> Self {
+        Self(SubRect { x: 0, y: 0, size })
     }
 
     /// Create a sub-view based on this view.
-    pub fn sub<P, S>(&self, target: (P, P, S, S)) -> Option<Self>
+    pub fn sub<S>(&self, target: S) -> Option<Self>
     where
-        P: TryInto<i32>,
-        S: TryInto<i32>,
+        S: TryInto<SubRect>,
     {
-        Self::new(target, self.as_i32_slice())
+        Self::new(target, self.as_sub_rect())
+    }
+
+    /// Create a sub rectangle where the position can be negative.
+    pub fn sub_i32(&self, x: i32, y: i32, size: Size) -> Option<Self> {
+        // Don't allow the X and Y to be smaller than 0
+        let (clip_x, clip_y) = (x.max(0), y.max(0));
+        // Calculate how much pixels got clipped
+        let (offset_x, offset_y) = (clip_x - x, clip_y - y);
+
+        // Remove the clipped pixels from the size
+        let (new_width, new_height) = (
+            (size.width() as i32 - offset_x).max(0),
+            (size.height() as i32 - offset_y).max(0),
+        );
+        let size = match Size::new(new_width as u32, new_height as u32) {
+            Ok(size) => size,
+            _ => return None,
+        };
+
+        Some(Self(SubRect {
+            x: clip_x as u32,
+            y: clip_y as u32,
+            size,
+        }))
     }
 
     /// Iterator over horizontal ranges in the buffer the view is based on.
@@ -118,44 +96,56 @@ impl ImageView {
     /// Each range represents a slice of bytes that can be taken.
     /// Bounds checks should have already been done by the new function.
     pub fn parent_ranges_iter(&self, parent_width: usize) -> impl Iterator<Item = Range<usize>> {
-        let (width, height) = self.size;
-        let (width, height) = (width.get(), height.get());
-
-        let (start_x, start_y) = self.offset;
-        let (start_x, start_y) = (start_x as usize, start_y as usize);
-        let end_y = start_y + height;
+        let (width, height) = self.0.size.as_tuple();
+        let (start_x, start_y) = (self.0.x as usize, self.0.y as usize);
+        let end_y = start_y + height as usize;
 
         (start_y..end_y).into_iter().map(move |y| {
             let start_x = (y * parent_width + start_x) as usize;
-            let end_x = start_x + width;
+            let end_x = start_x + width as usize;
 
             start_x..end_x
         })
     }
 
     /// Get our data as a `(x, y, width, height)` slice.
-    pub fn as_slice(&self) -> (i32, i32, NonZeroUsize, NonZeroUsize) {
-        (self.offset.0, self.offset.1, self.size.0, self.size.1)
+    pub fn as_slice(&self) -> (u32, u32, NonZeroU32, NonZeroU32) {
+        self.0.as_slice()
     }
 
-    /// Get our data as a `(x, y, width, height)` slice with only `i32` values.
-    pub fn as_i32_slice(&self) -> (i32, i32, i32, i32) {
-        (
-            self.offset.0,
-            self.offset.1,
-            self.size.0.get() as i32,
-            self.size.1.get() as i32,
-        )
+    /// Get our data as the subrectangle.
+    pub fn as_sub_rect(&self) -> SubRect {
+        self.0
     }
 
     /// Get the amount of X pixels.
-    pub fn width(&self) -> usize {
-        self.size.0.get()
+    pub fn width(&self) -> u32 {
+        self.0.width()
     }
 
     /// Get the amount of Y pixels.
-    pub fn height(&self) -> usize {
-        self.size.1.get()
+    pub fn height(&self) -> u32 {
+        self.0.height()
+    }
+}
+
+impl From<SubRect> for ImageView {
+    fn from(value: SubRect) -> Self {
+        ImageView(value)
+    }
+}
+
+impl<X, Y, W, H> TryFrom<(X, Y, W, H)> for ImageView
+where
+    X: ToPrimitive,
+    Y: ToPrimitive,
+    W: ToPrimitive,
+    H: ToPrimitive,
+{
+    type Error = Error;
+
+    fn try_from(rect: (X, Y, W, H)) -> Result<Self> {
+        Ok(Self(SubRect::try_from(rect)?))
     }
 }
 

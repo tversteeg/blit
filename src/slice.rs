@@ -19,13 +19,15 @@
 //! BlitOptions::slice9((x, y), 3, 6, 3, 6);
 //! ```
 
+use std::num::NonZeroU32;
+
 /// Divide the source buffer into multiple sections and repeat the chosen section to fill the area.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Slice {
     /// Split the buffer into two and repeat one of the sections.
     Binary {
         /// Position between the first and last section to split.
-        split: i32,
+        split: u32,
         /// Which of the sections to scale when the area is bigger than the total size.
         repeat: BinarySection,
     },
@@ -33,9 +35,9 @@ pub enum Slice {
     /// Split the buffer into three and repeat one of the sections.
     Ternary {
         /// Position between the first and the middle section.
-        split_first: i32,
+        split_first: u32,
         /// Position between the middle and last section.
-        split_last: i32,
+        split_last: NonZeroU32,
         /// Which of the sections to scale when the area is bigger than the total size.
         repeat: TernarySection,
     },
@@ -46,7 +48,7 @@ impl Slice {
     ///
     /// When horizontal this is the top section.
     /// When vertical this is the left section.
-    pub fn binary_first(split: i32) -> Self {
+    pub fn binary_first(split: u32) -> Self {
         Self::Binary {
             split,
             repeat: BinarySection::First,
@@ -57,7 +59,7 @@ impl Slice {
     ///
     /// When horizontal this is the bottom section.
     /// When vertical this is the right section.
-    pub fn binary_last(split: i32) -> Self {
+    pub fn binary_last(split: u32) -> Self {
         Self::Binary {
             split,
             repeat: BinarySection::Last,
@@ -68,7 +70,7 @@ impl Slice {
     ///
     /// When horizontal this is the top section.
     /// When vertical this is the left section.
-    pub fn ternary_first(split_first: i32, split_last: i32) -> Self {
+    pub fn ternary_first(split_first: u32, split_last: NonZeroU32) -> Self {
         Self::Ternary {
             split_first,
             split_last,
@@ -79,7 +81,7 @@ impl Slice {
     /// Create a ternary split where the last section is chosen.
     ///
     /// With both horizontal and vertical this is the middle section.
-    pub fn ternary_middle(split_first: i32, split_last: i32) -> Self {
+    pub fn ternary_middle(split_first: u32, split_last: NonZeroU32) -> Self {
         Self::Ternary {
             split_first,
             split_last,
@@ -91,7 +93,7 @@ impl Slice {
     ///
     /// When horizontal this is the bottom section.
     /// When vertical this is the right section.
-    pub fn ternary_last(split_first: i32, split_last: i32) -> Self {
+    pub fn ternary_last(split_first: u32, split_last: NonZeroU32) -> Self {
         Self::Ternary {
             split_first,
             split_last,

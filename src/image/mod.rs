@@ -1,18 +1,21 @@
-use std::ops::Deref;
+use std::{num::NonZeroU32, ops::Deref};
 
 use image::{ImageBuffer, Pixel};
 use imgref::ImgVec;
 use num_traits::ToPrimitive;
 use palette::{rgb::channels::Argb, Packed};
 
-use crate::{BlitBuffer, Color, ToBlitBuffer};
+use crate::{
+    error::{Error, Result},
+    BlitBuffer, Color, ToBlitBuffer,
+};
 
 impl<P, Container> ToBlitBuffer for ImageBuffer<P, Container>
 where
     P: Pixel,
     Container: Deref<Target = [P::Subpixel]>,
 {
-    fn to_blit_buffer_with_mask_color<C>(&self, mask_color: C) -> BlitBuffer
+    fn to_blit_buffer_with_mask_color<C>(&self, mask_color: C) -> Result<BlitBuffer>
     where
         C: Into<Packed<Argb>>,
     {
@@ -37,12 +40,12 @@ where
                     pixel
                 }
             }),
-            width as i32,
+            NonZeroU32::new(width).ok_or(Error::ZeroWidth)?,
             127,
         )
     }
 
-    fn to_blit_buffer_with_alpha(&self, alpha_treshold: u8) -> BlitBuffer {
+    fn to_blit_buffer_with_alpha(&self, alpha_treshold: u8) -> Result<BlitBuffer> {
         let (width, _height) = self.dimensions();
 
         BlitBuffer::from_iter(
@@ -55,18 +58,9 @@ where
                     ToPrimitive::to_u64(&pixel[2]).unwrap_or(0x0),
                 )
             }),
-            width as i32,
+            NonZeroU32::new(width).ok_or(Error::ZeroWidth)?,
             alpha_treshold,
         )
-    }
-
-    fn to_img_with_mask_color<C>(&self, mask_color: C) -> ImgVec<u32>
-    where
-        C: Into<Packed<Argb>>,
-    {
-        let buf = self.to_blit_buffer_with_mask_color(mask_color);
-
-        ImgVec::new(buf.data, buf.width as usize, buf.height as usize)
     }
 }
 
