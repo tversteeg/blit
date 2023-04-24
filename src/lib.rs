@@ -48,10 +48,7 @@ pub mod prelude {
     pub use crate::{Blit, BlitBuffer};
 }
 
-use std::{
-    num::{NonZeroU32, NonZeroUsize},
-    ops::Range,
-};
+use std::ops::Range;
 
 use error::{Error, Result};
 use num_traits::ToPrimitive;
@@ -129,11 +126,27 @@ impl BlitOptions {
     /// Setup options for blitting at position `(x, y)`.
     ///
     /// When no other fields are changed or methods are called this will render the full source.
-    pub fn new<P>(position: P) -> Self
+    pub fn new<P>(x: P, y: P) -> Self
     where
-        P: Into<(i32, i32)>,
+        P: ToPrimitive,
     {
-        let (x, y) = position.into();
+        let (x, y) = (x.to_i32().unwrap_or(0), y.to_i32().unwrap_or(0));
+
+        Self {
+            x,
+            y,
+            ..Default::default()
+        }
+    }
+
+    /// Setup options for blitting at position `(x, y)`.
+    ///
+    /// When no other fields are changed or methods are called this will render the full source.
+    pub fn from_tuple<P>((x, y): (P, P)) -> Self
+    where
+        P: ToPrimitive,
+    {
+        let (x, y) = (x.to_i32().unwrap_or(0), y.to_i32().unwrap_or(0));
 
         Self {
             x,
@@ -153,16 +166,22 @@ impl BlitOptions {
     ///
     /// All other fields will be set to [`BlitOptions::default()`].
     pub fn slice9<P>(
-        position: P,
+        x: P,
+        y: P,
         slice_left: u32,
-        slice_right: NonZeroU32,
+        slice_right: u32,
         slice_top: u32,
-        slice_bottom: NonZeroU32,
+        slice_bottom: u32,
     ) -> Self
     where
-        P: Into<(i32, i32)>,
+        P: ToPrimitive,
     {
-        Self::new(position).with_slice9(slice_left, slice_right, slice_top, slice_bottom)
+        Self::new(x.to_i32().unwrap_or(0), y.to_i32().unwrap_or(0)).with_slice9(
+            slice_left,
+            slice_right,
+            slice_top,
+            slice_bottom,
+        )
     }
 
     /// Set the size of the area `(width, height)` on the destination buffer.
@@ -173,10 +192,7 @@ impl BlitOptions {
     /// # Sets field(s)
     ///
     /// - [`BlitOptions::area`]
-    pub fn with_area<S>(mut self, area: S) -> Self
-    where
-        S: Into<Size>,
-    {
+    pub fn with_area(mut self, area: Size) -> Self {
         self.set_area(area);
 
         self
@@ -193,10 +209,7 @@ impl BlitOptions {
     ///
     /// - [`BlitOptions::sub_rect`]
     /// - [`BlitOptions::area`] to `(width, height)` if it's `None`
-    pub fn with_sub_rect<R>(mut self, sub_rect: R) -> Self
-    where
-        R: Into<SubRect>,
-    {
+    pub fn with_sub_rect(mut self, sub_rect: SubRect) -> Self {
         self.set_sub_rect(sub_rect);
 
         self
@@ -211,9 +224,9 @@ impl BlitOptions {
     pub fn with_slice9(
         mut self,
         slice_left: u32,
-        slice_right: NonZeroU32,
+        slice_right: u32,
         slice_top: u32,
-        slice_bottom: NonZeroU32,
+        slice_bottom: u32,
     ) -> Self {
         self.vertical_slices = Some(Slice::ternary_middle(slice_left, slice_right));
         self.horizontal_slices = Some(Slice::ternary_middle(slice_top, slice_bottom));
@@ -245,10 +258,7 @@ impl BlitOptions {
     /// Get the destination area `(width, height)`.
     ///
     /// If [`BlitOptions::area`] is `None` the size of the source will be returned.
-    pub fn area<S>(&self, source_size: S) -> Size
-    where
-        S: Into<Size>,
-    {
+    pub fn area(&self, source_size: Size) -> Size {
         self.area.unwrap_or(source_size.into())
     }
 
@@ -263,11 +273,7 @@ impl BlitOptions {
     ///
     /// - [`BlitOptions::sub_rect`]
     /// - [`BlitOptions::area`] to `(width, height)` if it's `None`
-    pub fn set_sub_rect<R>(&mut self, sub_rect: R)
-    where
-        R: Into<SubRect>,
-    {
-        let sub_rect = sub_rect.into();
+    pub fn set_sub_rect(&mut self, sub_rect: SubRect) {
         self.sub_rect = Some(sub_rect);
 
         // Don't tile the image when only the subrectangle is set
@@ -280,12 +286,7 @@ impl BlitOptions {
     ///
     /// - If [`BlitOptions::sub_rect`] is `None` the size of the source will be returned with `(0, 0)` as the position.
     /// - If [`BlitOptions::sub_rect`] and [`BlitOptions::area`] are set it, the `width` and `height` will be shrunk to match those of the area.
-    pub fn sub_rect<R>(&self, source_size: R) -> SubRect
-    where
-        R: Into<Size>,
-    {
-        let source_size = source_size.into();
-
+    pub fn sub_rect(&self, source_size: Size) -> SubRect {
         // Get the sub rectangle defined or from the source
         let mut sub_rect = self
             .sub_rect
@@ -310,10 +311,7 @@ impl BlitOptions {
     /// # Sets field(s)
     ///
     /// - [`BlitOptions::area`]
-    pub fn set_area<S>(&mut self, area: S)
-    where
-        S: Into<Size>,
-    {
+    pub fn set_area(&mut self, area: Size) {
         self.area = Some(area.into());
     }
 }
@@ -341,7 +339,7 @@ impl BlitBuffer {
     /// The alpha treshold is the offset point at which an alpha value will be used as either a transparent pixel or a colored one.
     pub fn from_buffer<S>(src: &[Color], width: S, alpha_treshold: u8) -> Result<Self>
     where
-        S: TryInto<NonZeroUsize>,
+        S: TryInto<usize>,
     {
         Self::from_iter(src.iter().copied(), width, alpha_treshold)
     }
@@ -353,7 +351,7 @@ impl BlitBuffer {
     pub fn from_iter<I, S>(iter: I, width: S, alpha_treshold: u8) -> Result<Self>
     where
         I: Iterator<Item = Color>,
-        S: TryInto<NonZeroUsize>,
+        S: ToPrimitive,
     {
         // Shift the alpha to the highest bits so we can do a direct comparison without needing to shift every pixel again
         let alpha_treshold = (alpha_treshold as Color) << 24;
@@ -370,19 +368,19 @@ impl BlitBuffer {
             .collect::<Vec<_>>();
 
         // We can calculate the height from the total buffer
-        let size = Size::from_len(data.len(), width.try_into().map_err(|_| Error::ZeroWidth)?)?;
+        let size = Size::from_len(data.len(), width.to_usize().unwrap_or_default());
 
         Ok(Self { size, data })
     }
 
     /// Get the width of the buffer in pixels.
     pub fn width(&self) -> u32 {
-        self.size.width.get()
+        self.size.width()
     }
 
     /// Get the height of the buffer in pixels.
     pub fn height(&self) -> u32 {
-        self.size.height.get()
+        self.size.height()
     }
 
     /// Get a reference to the pixel data.
@@ -449,74 +447,58 @@ impl Blit for BlitBuffer {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Size {
     /// Width in pixels.
-    width: NonZeroU32,
+    width: u32,
     /// Height in pixels.
-    height: NonZeroU32,
+    height: u32,
 }
 
 impl Size {
     /// Create a new size, throws an error when either dimension is zero.
-    pub fn new(width: u32, height: u32) -> Result<Self> {
-        let width = NonZeroU32::new(width).ok_or(Error::ZeroWidth)?;
-        let height = NonZeroU32::new(height).ok_or(Error::ZeroHeight)?;
-
-        Ok(Self { width, height })
-    }
-
-    /// Create from a `NonZeroU32` tuple.
-    pub fn from_tuple((width, height): (NonZeroU32, NonZeroU32)) -> Self {
+    pub fn new(width: u32, height: u32) -> Self {
         Self { width, height }
     }
 
+    /// Create from a `u32` tuple.
+    pub const fn from_tuple((width, height): (u32, u32)) -> Self {
+        Self::new(width, height)
+    }
+
     /// Calculate the size from the length of a buffer and the width.
-    pub(crate) fn from_len(len: usize, width: NonZeroUsize) -> Result<Self> {
-        let height = NonZeroUsize::new(len / width.get()).ok_or(Error::ZeroHeight)?;
-
-        let width = width.try_into().expect("Buffer is too big");
-        let height = height.try_into().expect("Buffer is too big");
-
-        Ok(Self { width, height })
+    pub(crate) fn from_len(len: usize, width: usize) -> Self {
+        Self::new(width as u32, (len / width) as u32)
     }
 
     /// Set the size to the `min()` of another size.
     pub(crate) fn min(&self, other: Self) -> Self {
-        Size {
-            width: self.width.min(other.width),
-            height: self.height.min(other.height),
-        }
+        Self::new(self.width.min(other.width), self.height.min(other.height))
     }
 
     /// Width in pixels.
-    pub fn width(&self) -> u32 {
-        self.width.get()
+    pub const fn width(&self) -> u32 {
+        self.width
     }
 
     /// Height in pixels.
-    pub fn height(&self) -> u32 {
-        self.height.get()
+    pub const fn height(&self) -> u32 {
+        self.height
     }
 
     /// Tuple of `(width, height)`.'
-    pub fn as_tuple(&self) -> (u32, u32) {
+    pub const fn as_tuple(&self) -> (u32, u32) {
         (self.width(), self.height())
     }
 }
 
-impl<W, H> TryFrom<(W, H)> for Size
+impl<W, H> From<(W, H)> for Size
 where
     W: ToPrimitive,
     H: ToPrimitive,
 {
-    type Error = Error;
+    fn from((width, height): (W, H)) -> Self {
+        let width = width.to_u32().unwrap_or_default();
+        let height = height.to_u32().unwrap_or_default();
 
-    fn try_from((width, height): (W, H)) -> Result<Self> {
-        let width = width.to_u32().ok_or(Error::InvalidNumber)?;
-        let height = height.to_u32().ok_or(Error::InvalidNumber)?;
-
-        let width = NonZeroU32::new(width).ok_or(Error::ZeroWidth)?;
-        let height = NonZeroU32::new(height).ok_or(Error::ZeroHeight)?;
-
-        Ok(Self { width, height })
+        Self { width, height }
     }
 }
 
@@ -536,26 +518,24 @@ pub struct SubRect {
 }
 
 impl SubRect {
-    /// Construct from a size with zero coordinates.
-    pub fn from_size(size: Size) -> Self {
-        Self { x: 0, y: 0, size }
+    /// Create a new sub-rectangle.
+    pub const fn new(x: u32, y: u32, size: Size) -> Self {
+        Self { x, y, size }
     }
 
-    /// Create from a tuple.
-    pub fn from_tuple((x, y, width, height): (u32, u32, NonZeroU32, NonZeroU32)) -> Self {
-        let size = Size { width, height };
-
-        Self { x, y, size }
+    /// Construct from a size with zero coordinates.
+    pub const fn from_size(size: Size) -> Self {
+        Self { x: 0, y: 0, size }
     }
 
     /// Width as `u32`.
     pub fn width(&self) -> u32 {
-        self.size.width.get()
+        self.size.width
     }
 
     /// Height as `u32`.
     pub fn height(&self) -> u32 {
-        self.size.height.get()
+        self.size.height
     }
 
     /// Right position, `x + width`.
@@ -569,12 +549,12 @@ impl SubRect {
     }
 
     /// `(x, y, width, height)` slice.
-    pub fn as_slice(&self) -> (u32, u32, NonZeroU32, NonZeroU32) {
+    pub fn as_slice(&self) -> (u32, u32, u32, u32) {
         (self.x, self.y, self.size.width, self.size.height)
     }
 }
 
-impl<X, Y, W, H> TryFrom<(X, Y, W, H)> for SubRect
+impl<X, Y, W, H> From<(X, Y, W, H)> for SubRect
 where
     X: ToPrimitive,
     Y: ToPrimitive,
@@ -583,12 +563,12 @@ where
 {
     type Error = Error;
 
-    fn try_from((x, y, width, height): (X, Y, W, H)) -> Result<Self> {
-        let x = x.to_u32().ok_or(Error::InvalidNumber)?;
-        let y = y.to_u32().ok_or(Error::InvalidNumber)?;
-        let size = Size::try_from((width, height))?;
+    fn from((x, y, width, height): (X, Y, W, H)) -> Self {
+        let x = x.to_u32().unwrap_or(0);
+        let y = y.to_u32().unwrap_or(0);
+        let size = Size::from((width, height));
 
-        Ok(Self { x, y, size })
+        Self { x, y, size }
     }
 }
 
@@ -619,7 +599,7 @@ mod tests {
                 0xBB,
                 0xBB,
             ],
-            NonZeroU32::new(2).unwrap(),
+            u32::new(2).unwrap(),
             127,
         )
         .unwrap();
