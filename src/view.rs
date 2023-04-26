@@ -76,13 +76,15 @@ impl ImageView {
 
         // Remove the clipped pixels from the size
         let (new_width, new_height) = (
-            (size.width() as i32 - offset_x).max(0),
-            (size.height() as i32 - offset_y).max(0),
+            (size.width as i32 - offset_x).max(0),
+            (size.height as i32 - offset_y).max(0),
         );
-        let size = match Size::new(new_width as u32, new_height as u32) {
-            Ok(size) => size,
-            _ => return None,
-        };
+        let size = Size::new(new_width as u32, new_height as u32);
+
+        // Taking a subrectangle failed when the size is zero
+        if size.width == 0 || size.height == 0 {
+            return None;
+        }
 
         Some(Self(SubRect {
             x: clip_x as u32,
@@ -109,7 +111,7 @@ impl ImageView {
     }
 
     /// Get our data as a `(x, y, width, height)` slice.
-    pub fn as_slice(&self) -> (u32, u32, NonZeroU32, NonZeroU32) {
+    pub fn as_slice(&self) -> (u32, u32, u32, u32) {
         self.0.as_slice()
     }
 
@@ -127,6 +129,11 @@ impl ImageView {
     pub fn height(&self) -> u32 {
         self.0.height()
     }
+
+    /// Size in pixels.
+    pub fn size(&self) -> Size {
+        self.0.size
+    }
 }
 
 impl From<SubRect> for ImageView {
@@ -135,17 +142,15 @@ impl From<SubRect> for ImageView {
     }
 }
 
-impl<X, Y, W, H> TryFrom<(X, Y, W, H)> for ImageView
+impl<X, Y, W, H> From<(X, Y, W, H)> for ImageView
 where
     X: ToPrimitive,
     Y: ToPrimitive,
     W: ToPrimitive,
     H: ToPrimitive,
 {
-    type Error = Error;
-
-    fn try_from(rect: (X, Y, W, H)) -> Result<Self> {
-        Ok(Self(SubRect::try_from(rect)?))
+    fn from(rect: (X, Y, W, H)) -> Self {
+        Self(SubRect::from(rect))
     }
 }
 

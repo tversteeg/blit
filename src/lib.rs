@@ -32,6 +32,7 @@
 #[cfg(feature = "aseprite")]
 pub mod aseprite;
 pub mod error;
+mod geom;
 #[cfg(feature = "image")]
 mod image;
 pub mod slice;
@@ -51,6 +52,7 @@ pub mod prelude {
 use std::ops::Range;
 
 use error::{Error, Result};
+pub use geom::{Size, SubRect};
 use num_traits::ToPrimitive;
 use palette::{rgb::channels::Argb, Packed};
 #[cfg(feature = "serde")]
@@ -339,7 +341,7 @@ impl BlitBuffer {
     /// The alpha treshold is the offset point at which an alpha value will be used as either a transparent pixel or a colored one.
     pub fn from_buffer<S>(src: &[Color], width: S, alpha_treshold: u8) -> Result<Self>
     where
-        S: TryInto<usize>,
+        S: ToPrimitive,
     {
         Self::from_iter(src.iter().copied(), width, alpha_treshold)
     }
@@ -373,14 +375,19 @@ impl BlitBuffer {
         Ok(Self { size, data })
     }
 
-    /// Get the width of the buffer in pixels.
+    /// Width of the buffer in pixels.
     pub fn width(&self) -> u32 {
-        self.size.width()
+        self.size.width
     }
 
-    /// Get the height of the buffer in pixels.
+    /// Height of the buffer in pixels.
     pub fn height(&self) -> u32 {
-        self.size.height()
+        self.size.height
+    }
+
+    /// Size of the blitbuffer in pixels.
+    pub fn size(&self) -> Size {
+        self.size
     }
 
     /// Get a reference to the pixel data.
@@ -434,141 +441,30 @@ impl Blit for BlitBuffer {
         // Convert our source to a view
         let src = ImageView::full(self.size);
 
+        // Find a view on the dst based on the area
         let area = options.area(self.size);
-        // Get a view on the dst based on the area
         let dst_area = match dst.sub_i32(options.x, options.y, area) {
             Some(dst_area) => dst_area,
             None => return,
         };
-    }
-}
 
-/// Helper struct for defining sizes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Size {
-    /// Width in pixels.
-    width: u32,
-    /// Height in pixels.
-    height: u32,
-}
+        // Another view based on the subrectangle
+        let sub_rect_view = match src.sub(options.sub_rect(self.size)) {
+            Some(sub_rect_view) => sub_rect_view,
+            None => return,
+        };
 
-impl Size {
-    /// Create a new size, throws an error when either dimension is zero.
-    pub fn new(width: u32, height: u32) -> Self {
-        Self { width, height }
-    }
+        // We can draw the image exactly
+        if sub_rect_view.size() == area {
+            // Pixel range of the source
+            sub_rect_view
+                .parent_ranges_iter(src.width() as usize)
+                // Zipped with pixel range of the destination
+                .zip(dst_area.parent_ranges_iter(dst_size.width as usize))
+                .for_each(|range| todo!());
+        }
 
-    /// Create from a `u32` tuple.
-    pub const fn from_tuple((width, height): (u32, u32)) -> Self {
-        Self::new(width, height)
-    }
-
-    /// Calculate the size from the length of a buffer and the width.
-    pub(crate) fn from_len(len: usize, width: usize) -> Self {
-        Self::new(width as u32, (len / width) as u32)
-    }
-
-    /// Set the size to the `min()` of another size.
-    pub(crate) fn min(&self, other: Self) -> Self {
-        Self::new(self.width.min(other.width), self.height.min(other.height))
-    }
-
-    /// Width in pixels.
-    pub const fn width(&self) -> u32 {
-        self.width
-    }
-
-    /// Height in pixels.
-    pub const fn height(&self) -> u32 {
-        self.height
-    }
-
-    /// Tuple of `(width, height)`.'
-    pub const fn as_tuple(&self) -> (u32, u32) {
-        (self.width(), self.height())
-    }
-}
-
-impl<W, H> From<(W, H)> for Size
-where
-    W: ToPrimitive,
-    H: ToPrimitive,
-{
-    fn from((width, height): (W, H)) -> Self {
-        let width = width.to_u32().unwrap_or_default();
-        let height = height.to_u32().unwrap_or_default();
-
-        Self { width, height }
-    }
-}
-
-/// Helper struct for defining sub rectangles.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SubRect {
-    /// X offset in pixels.
-    ///
-    /// A sub rectangle cannot have negative coordinates since it's always part of a bigger rectangle which starts at `0`.
-    x: u32,
-    /// Y offset in pixels.
-    ///
-    /// A sub rectangle cannot have negative coordinates since it's always part of a bigger rectangle which starts at `0`.
-    y: u32,
-    /// Size of the rectangle in pixels.
-    size: Size,
-}
-
-impl SubRect {
-    /// Create a new sub-rectangle.
-    pub const fn new(x: u32, y: u32, size: Size) -> Self {
-        Self { x, y, size }
-    }
-
-    /// Construct from a size with zero coordinates.
-    pub const fn from_size(size: Size) -> Self {
-        Self { x: 0, y: 0, size }
-    }
-
-    /// Width as `u32`.
-    pub fn width(&self) -> u32 {
-        self.size.width
-    }
-
-    /// Height as `u32`.
-    pub fn height(&self) -> u32 {
-        self.size.height
-    }
-
-    /// Right position, `x + width`.
-    pub fn right(&self) -> u32 {
-        self.x + self.width()
-    }
-
-    /// Bottom position, `y + height`.
-    pub fn bottom(&self) -> u32 {
-        self.y + self.height()
-    }
-
-    /// `(x, y, width, height)` slice.
-    pub fn as_slice(&self) -> (u32, u32, u32, u32) {
-        (self.x, self.y, self.size.width, self.size.height)
-    }
-}
-
-impl<X, Y, W, H> From<(X, Y, W, H)> for SubRect
-where
-    X: ToPrimitive,
-    Y: ToPrimitive,
-    W: ToPrimitive,
-    H: ToPrimitive,
-{
-    type Error = Error;
-
-    fn from((x, y, width, height): (X, Y, W, H)) -> Self {
-        let x = x.to_u32().unwrap_or(0);
-        let y = y.to_u32().unwrap_or(0);
-        let size = Size::from((width, height));
-
-        Self { x, y, size }
+        dbg!(dst_area);
     }
 }
 

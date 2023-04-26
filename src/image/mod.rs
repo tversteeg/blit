@@ -40,7 +40,7 @@ where
                     pixel
                 }
             }),
-            NonZeroU32::new(width).ok_or(Error::ZeroWidth)?,
+            width,
             127,
         )
     }
@@ -58,7 +58,7 @@ where
                     ToPrimitive::to_u64(&pixel[2]).unwrap_or(0x0),
                 )
             }),
-            NonZeroU32::new(width).ok_or(Error::ZeroWidth)?,
+            width,
             alpha_treshold,
         )
     }

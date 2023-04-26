@@ -1,5 +1,6 @@
-use blit::{Blit, BlitOptions, Size, SubRect, ToBlitBuffer};
+use blit::{Blit, BlitBuffer, BlitOptions, Size, SubRect, ToBlitBuffer};
 
+use num_traits::ToPrimitive;
 use pixels::{wgpu::TextureFormat, PixelsBuilder, SurfaceTexture};
 use winit::{
     dpi::LogicalSize,
@@ -9,57 +10,51 @@ use winit::{
 };
 
 // Window settings
-const WIDTH: usize = 400;
-const HEIGHT: usize = 300;
+const DST_SIZE: Size = Size {
+    width: 400,
+    height: 300,
+};
 
 /// Color in the source image that needs to be masked to alpha.
 const MASK_COLOR: u32 = 0xFF_00_FF;
 
 /// Size of a single character.
-const CHAR_SIZE: Size = Size::from_tuple((9, 10));
+const CHAR_SIZE: Size = Size {
+    width: 9,
+    height: 10,
+};
 
 /// Show the text for clicking.
-fn frame0(dst: &mut [u32], _buf: &ImgVec<u32>, font: &ImgVec<u32>, _mouse: (i32, i32)) {
+fn frame0(dst: &mut [u32], _buf: &BlitBuffer, font: &BlitBuffer, _mouse: (i32, i32)) {
     draw_text(dst, font, 0, "Go to the next showcase item by clicking\nthe left mouse button.\n\nGo to the previous showcase item by\nclicking the right mouse button.");
 }
 
 /// Draw the sprite completely.
-fn frame1(dst: &mut [u32], buf: &ImgVec<u32>, font: &ImgVec<u32>, mouse: (i32, i32)) {
-    let (center_x, center_y) = (WIDTH / 2 - buf.width() / 2, HEIGHT / 2 - buf.height() / 2);
+fn frame1(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32)) {
+    let (center_x, center_y) = (DST_SIZE / 2 - buf.size() / 2).as_tuple();
 
-    buf.blit_opt(
-        dst,
-        WIDTH,
-        &BlitOptions::new(center_x as i32, center_y as i32),
-    );
-    buf.blit_opt(dst, WIDTH, &BlitOptions::from_tuple(mouse));
+    buf.blit(dst, DST_SIZE, &BlitOptions::new(center_x, center_y));
+    buf.blit(dst, DST_SIZE, &BlitOptions::from_tuple(mouse));
 
     draw_text(dst, font, 0, "Blit the full sprite");
     draw_text(
         dst,
         font,
-        HEIGHT as i32 - CHAR_WIDTH,
+        DST_SIZE.height - CHAR_SIZE.width,
         "BlitOptions::new(position)",
     );
 }
 
 /// Draw the left half of the sprite using the area option.
-fn frame2(dst: &mut [u32], buf: &ImgVec<u32>, font: &ImgVec<u32>, mouse: (i32, i32)) {
-    let (src_width, src_height) = (buf.width() as i32, buf.height() as i32);
-    let (center_x, center_y) = (
-        WIDTH as i32 / 2 - src_width / 2,
-        HEIGHT as i32 / 2 - src_height / 2,
-    );
+fn frame2(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32)) {
+    let (center_x, center_y) = (DST_SIZE / 2 - buf.size() / 2).as_tuple();
+    let mut sprite_size = buf.size();
+    sprite_size.width = (mouse.0 - center_x as i32).clamp(0, buf.width() as i32) as u32;
 
-    buf.blit_opt(
+    buf.blit(
         dst,
-        WIDTH,
-        &BlitOptions::new(center_x, center_y).with_sub_rect((
-            0,
-            0,
-            (mouse.0 - center_x).clamp(1, src_width),
-            src_height,
-        )),
+        DST_SIZE,
+        &BlitOptions::new(center_x, center_y).with_sub_rect(SubRect::from_size(sprite_size)),
     );
 
     draw_text(
@@ -71,28 +66,21 @@ fn frame2(dst: &mut [u32], buf: &ImgVec<u32>, font: &ImgVec<u32>, mouse: (i32, i
     draw_text(
         dst,
         font,
-        HEIGHT as i32 - CHAR_SIZE.height() as i32 * 2,
+        (DST_SIZE - CHAR_SIZE).height as i32 * 2,
         "BlitOptions::new(position)\n\t.with_area((mouse_x, height))",
     );
 }
 
 /// Draw the top half of the sprite by taking a sub rectangle from it.
-fn frame3(dst: &mut [u32], buf: &ImgVec<u32>, font: &ImgVec<u32>, mouse: (i32, i32)) {
-    let (src_width, src_height) = (buf.width() as i32, buf.height() as i32);
-    let (center_x, center_y) = (
-        WIDTH as i32 / 2 - src_width / 2,
-        HEIGHT as i32 / 2 - src_height / 2,
-    );
+fn frame3(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32)) {
+    let (center_x, center_y) = (DST_SIZE / 2 - buf.size() / 2).as_tuple();
+    let mut sprite_size = buf.size();
+    sprite_size.height = (mouse.1 - center_y as i32).clamp(0, buf.height() as i32) as u32;
 
-    buf.blit_opt(
+    buf.blit(
         dst,
-        WIDTH,
-        &BlitOptions::new(center_x, center_y).with_sub_rect((
-            0,
-            0,
-            src_width,
-            (mouse.1 - center_y).clamp(1, src_height),
-        )),
+        DST_SIZE,
+        &BlitOptions::new(center_x, center_y).with_sub_rect(SubRect::from_size(sprite_size)),
     );
 
     draw_text(
@@ -104,27 +92,23 @@ fn frame3(dst: &mut [u32], buf: &ImgVec<u32>, font: &ImgVec<u32>, mouse: (i32, i
     draw_text(
         dst,
         font,
-        HEIGHT as i32 - CHAR_SIZE.height() as i32 * 2,
+        (DST_SIZE - CHAR_SIZE).height as i32 * 2,
         "BlitOptions::new(position)\n\t.with_sub_rect((0, 0, width, mouse_y))",
     );
 }
 
 /// Draw the middle section of the sprite by taking a sub rectangle from it.
-fn frame4(dst: &mut [u32], buf: &ImgVec<u32>, font: &ImgVec<u32>, mouse: (i32, i32)) {
-    let (src_width, src_height) = (buf.width() as i32 / 2, buf.height() as i32 / 2);
-    let (center_x, center_y) = (
-        WIDTH as i32 / 2 - src_width / 2,
-        HEIGHT as i32 / 2 - src_height / 2,
-    );
+fn frame4(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32)) {
+    let src_size = buf.size() / 2;
+    let (center_x, center_y) = (DST_SIZE / 2 - buf.size() / 2).as_tuple();
 
-    buf.blit_opt(
+    buf.blit(
         dst,
-        WIDTH,
-        &BlitOptions::new(center_x, center_y).with_sub_rect((
-            (mouse.0 - center_x).clamp(0, src_width),
-            (mouse.1 - center_y).clamp(0, src_height),
-            src_width,
-            src_height,
+        DST_SIZE,
+        &BlitOptions::new(center_x, center_y).with_sub_rect(SubRect::new(
+            (mouse.0 - center_x as i32).clamp(0, src_size.width as i32),
+            (mouse.1 - center_y as i32).clamp(0, src_size.height as i32),
+            src_size,
         )),
     );
 
@@ -137,25 +121,22 @@ fn frame4(dst: &mut [u32], buf: &ImgVec<u32>, font: &ImgVec<u32>, mouse: (i32, i
     draw_text(
         dst,
         font,
-        HEIGHT as i32 - CHAR_SIZE.height() as i32 * 4,
+        (DST_SIZE - CHAR_SIZE).height * 4,
         "BlitOptions::new(position)\n\t.with_sub_rect(\n\t\t(mouse_x, mouse_y, w/2, h/2)\n\t)",
     );
 }
 
 /// Draw the full sprite tiled multiple times for each dimension.
-fn frame5(dst: &mut [u32], buf: &ImgVec<u32>, font: &ImgVec<u32>, mouse: (i32, i32)) {
+fn frame5(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32)) {
     let (offset_x, offset_y) = (20, 20);
 
-    buf.blit_opt(
+    buf.blit(
         dst,
-        WIDTH,
-        &BlitOptions::new(offset_x, offset_y).with_area(
-            Size::new(
-                (mouse.0 - offset_x).max(1) as u32,
-                (mouse.1 - offset_y).max(1) as u32,
-            )
-            .unwrap(),
-        ),
+        DST_SIZE,
+        &BlitOptions::new(offset_x, offset_y).with_area(Size::new(
+            (mouse.0 - offset_x).max(1),
+            (mouse.1 - offset_y).max(1),
+        )),
     );
 
     draw_text(
@@ -167,27 +148,24 @@ fn frame5(dst: &mut [u32], buf: &ImgVec<u32>, font: &ImgVec<u32>, mouse: (i32, i
     draw_text(
         dst,
         font,
-        HEIGHT as i32 - CHAR_SIZE.height() as i32 * 2,
+        (DST_SIZE - CHAR_SIZE).height * 2,
         "BlitOptions::new(position)\n\t.with_area(mouse)",
     );
 }
 
 /// Draw a sub-rectangle of the sprite tiled multiple times for each dimension.
-fn frame6(dst: &mut [u32], buf: &ImgVec<u32>, font: &ImgVec<u32>, mouse: (i32, i32)) {
+fn frame6(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32)) {
     let (offset_x, offset_y) = (20, 20);
 
-    buf.blit_opt(
+    buf.blit(
         dst,
-        WIDTH,
+        DST_SIZE,
         &BlitOptions::new(offset_x, offset_y)
-            .with_area(
-                Size::new(
-                    (mouse.0 - offset_x).max(1) as u32,
-                    (mouse.1 - offset_y).max(1) as u32,
-                )
-                .unwrap(),
-            )
-            .with_sub_rect(SubRect::new(0, 70, Size::new(34, 32).unwrap())),
+            .with_area(Size::new(
+                (mouse.0 - offset_x).max(1) as u32,
+                (mouse.1 - offset_y).max(1) as u32,
+            ))
+            .with_sub_rect(SubRect::new(0, 70, Size::new(34, 32))),
     );
 
     draw_text(
@@ -199,42 +177,43 @@ fn frame6(dst: &mut [u32], buf: &ImgVec<u32>, font: &ImgVec<u32>, mouse: (i32, i
     draw_text(
         dst,
         font,
-        HEIGHT as i32 - CHAR_SIZE.height() as i32 * 3,
+        (DST_SIZE - CHAR_SIZE).height * 3,
         "BlitOptions::new(position)\n\t.with_area(mouse)\n\t.with_sub_rect((0, 70, 34, 32))",
     );
 }
 
 /// Draw an ASCII string.
-fn draw_text(dst: &mut [u32], font: &ImgVec<u32>, mut y: i32, text: &str) {
+fn draw_text(dst: &mut [u32], font: &BlitBuffer, y: impl ToPrimitive, text: &str) {
     // First character in the image
     let char_start = '!';
     let char_end = '~';
 
     let mut x = 0;
+    let mut y = y.to_i32().unwrap_or_default();
 
     // Draw each character from the string
     text.chars().for_each(|ch| {
         // Move the cursor
-        x += CHAR_SIZE.width() as i32;
+        x += CHAR_SIZE.width as i32;
 
         // Don't draw characters that are not in the picture
         if ch < char_start || ch > char_end {
             if ch == '\n' {
                 x = 0;
-                y += CHAR_SIZE.height() as i32;
+                y += CHAR_SIZE.height as i32;
             } else if ch == '\t' {
-                x += CHAR_SIZE.width() as i32 * 3;
+                x += CHAR_SIZE.width as i32 * 3;
             }
             return;
         }
 
         // The sub rectangle offset of the character is based on the starting character and counted using the ASCII index
-        let char_offset = (ch as u8 - char_start as u8) as u32 * CHAR_SIZE.width();
+        let char_offset = (ch as u8 - char_start as u8) as u32 * CHAR_SIZE.width;
 
         // Draw the character
         font.blit(
             dst,
-            WIDTH,
+            DST_SIZE,
             &BlitOptions::new(x, y).with_sub_rect(SubRect::new(char_offset, 0, CHAR_SIZE)),
         );
     });
@@ -246,17 +225,19 @@ async fn run() {
     let buf = image::load_from_memory(include_bytes!("./smiley_rgb.png"))
         .unwrap()
         .into_rgb8()
-        .to_blit_buffer_with_mask_color(MASK_COLOR);
+        .to_blit_buffer_with_mask_color(MASK_COLOR)
+        .unwrap();
 
     // Load the font image with mask color from disk
     let font = image::load_from_memory(include_bytes!("./ArtosSans.png"))
         .unwrap()
         .into_rgb8()
-        .to_blit_buffer_with_mask_color(MASK_COLOR);
+        .to_blit_buffer_with_mask_color(MASK_COLOR)
+        .unwrap();
 
     // Setup a winit window
     let event_loop = EventLoop::new();
-    let size = LogicalSize::new(WIDTH as f64, HEIGHT as f64);
+    let size = LogicalSize::new(DST_SIZE.width as f64, DST_SIZE.height as f64);
     let window = WindowBuilder::new()
         .with_inner_size(size)
         .with_min_inner_size(size)
@@ -268,8 +249,8 @@ async fn run() {
     wasm::setup_canvas(&window);
 
     let mut pixels = {
-        let surface_texture = SurfaceTexture::new(WIDTH as u32, HEIGHT as u32, &window);
-        PixelsBuilder::new(WIDTH as u32, HEIGHT as u32, surface_texture)
+        let surface_texture = SurfaceTexture::new(DST_SIZE.width, DST_SIZE.height, &window);
+        PixelsBuilder::new(DST_SIZE.width, DST_SIZE.height, surface_texture)
             .clear_color(pixels::wgpu::Color {
                 r: 0.3,
                 g: 0.1,
@@ -289,7 +270,7 @@ async fn run() {
     let mut current_frame = 0;
 
     // All frame drawing functions, cycled by clicking
-    let frames: Vec<fn(&mut [u32], &ImgVec<u32>, &ImgVec<u32>, (i32, i32))> =
+    let frames: Vec<fn(&mut [u32], &BlitBuffer, &BlitBuffer, (i32, i32))> =
         vec![frame0, frame1, frame2, frame3, frame4, frame5, frame6];
 
     // Keep track of how long each frame takes to render
