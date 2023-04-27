@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use blit::{Blit, BlitBuffer, BlitOptions, Size, SubRect, ToBlitBuffer};
 
 use num_traits::ToPrimitive;
@@ -244,18 +246,21 @@ async fn run() {
     // Setup a winit window
     let event_loop = EventLoop::new();
     let size = LogicalSize::new(DST_SIZE.width as f64, DST_SIZE.height as f64);
-    let window = WindowBuilder::new()
-        .with_inner_size(size)
-        .with_min_inner_size(size)
-        .build(&event_loop)
-        .unwrap();
+    let window = Rc::new(
+        WindowBuilder::new()
+            .with_title("Blit Showcase")
+            .with_inner_size(size)
+            .with_min_inner_size(size)
+            .build(&event_loop)
+            .unwrap(),
+    );
 
     // Setup the WASM canvas if running on the browser
     #[cfg(target_arch = "wasm32")]
-    wasm::setup_canvas(&window);
+    wasm::setup_canvas(window.clone());
 
     let mut pixels = {
-        let surface_texture = SurfaceTexture::new(DST_SIZE.width, DST_SIZE.height, &window);
+        let surface_texture = SurfaceTexture::new(DST_SIZE.width, DST_SIZE.height, window.as_ref());
         PixelsBuilder::new(DST_SIZE.width, DST_SIZE.height, surface_texture)
             .clear_color(pixels::wgpu::Color {
                 r: 0.3,
@@ -372,6 +377,9 @@ async fn run() {
 fn main() {
     #[cfg(target_arch = "wasm32")]
     {
+        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+        console_log::init_with_level(log::Level::Info).expect("error initializing logger");
+
         wasm_bindgen_futures::spawn_local(run());
     }
     #[cfg(not(target_arch = "wasm32"))]
@@ -382,35 +390,47 @@ fn main() {
 
 #[cfg(target_arch = "wasm32")]
 mod wasm {
-    use wasm_bindgen::prelude::*;
-    use winit::{platform::web::WindowExtWebSys, window::Window};
-
-    /// Run main on the browser.
-    #[wasm_bindgen(start)]
-    pub fn run() {
-        console_log::init_with_level(log::Level::Info).expect("error initializing logger");
-
-        super::main();
-    }
+    use std::rc::Rc;
+    use wasm_bindgen::{closure::Closure, JsCast};
+    use web_sys::{Element, Event};
+    use winit::{dpi::LogicalSize, platform::web::WindowExtWebSys, window::Window};
 
     /// Attach the winit window to a canvas.
-    pub fn setup_canvas(window: &Window) {
+    pub fn setup_canvas(window: Rc<Window>) {
         log::debug!("Binding window to HTML canvas");
 
-        let canvas = window.canvas();
+        // Retrieve current width and height dimensions of browser client window
+        let get_window_size = || {
+            let client_window = web_sys::window().unwrap();
+            LogicalSize::new(
+                client_window.inner_width().unwrap().as_f64().unwrap(),
+                client_window.inner_height().unwrap().as_f64().unwrap(),
+            )
+        };
 
-        let window = web_sys::window().unwrap();
-        let document = window.document().unwrap();
-        let body = document.body().unwrap();
-        body.style().set_css_text("text-align: center");
+        let window = Rc::clone(&window);
 
-        body.append_child(&canvas).unwrap();
-        canvas.style().set_css_text("display:block; margin: auto");
-        canvas.set_width(600);
-        canvas.set_height(400);
+        // Initialize winit window with current dimensions of browser client
+        window.set_inner_size(get_window_size());
 
-        let header = document.create_element("h2").unwrap();
-        header.set_text_content(Some("Blit Example - Aseprite Animation"));
-        body.append_child(&header).unwrap();
+        let client_window = web_sys::window().unwrap();
+
+        // Attach winit canvas to body element
+        web_sys::window()
+            .and_then(|win| win.document())
+            .and_then(|doc| doc.body())
+            .and_then(|body| body.append_child(&Element::from(window.canvas())).ok())
+            .expect("couldn't append canvas to document body");
+
+        // Listen for resize event on browser client. Adjust winit window dimensions
+        // on event trigger
+        let closure = Closure::wrap(Box::new(move |_e: Event| {
+            let size = get_window_size();
+            window.set_inner_size(size)
+        }) as Box<dyn FnMut(_)>);
+        client_window
+            .add_event_listener_with_callback("resize", closure.as_ref().unchecked_ref())
+            .unwrap();
+        closure.forget();
     }
 }
