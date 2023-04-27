@@ -1,8 +1,13 @@
+//! Helper structs for simple geometric calculations.
+
 use std::ops::{Add, Div, Mul, Rem, Sub};
 
 use num_traits::ToPrimitive;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 /// Helper struct for defining sizes.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Size {
     /// Width in pixels.
@@ -167,6 +172,7 @@ impl<T: ToPrimitive> Rem<T> for Size {
 }
 
 /// Helper struct for defining sub rectangles.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SubRect {
     /// X offset in pixels.
