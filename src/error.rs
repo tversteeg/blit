@@ -3,6 +3,7 @@ pub(crate) type Result<T> = std::result::Result<T, Error>;
 
 /// Any error this library can throw.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     #[cfg(feature = "aseprite")]
     #[error("no frame tags found in metadata of Aseprite JSON, did you export it from Aseprite using 'Array'?")]

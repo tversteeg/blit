@@ -15,78 +15,18 @@ Add this to your `Cargo.toml`:
 blit = "0.7"
 ```
 
-## Demos
+## [Interactive Demo](https://tversteeg.nl/blit/showcase)
 
-### [Smiley](https://tversteeg.nl/blit/smiley/)
-
-Web: https://tversteeg.nl/blit/smiley/
+Web: https://tversteeg.nl/blit/showcase/
 
 Uses the `["image"]` feature flag.
 
-Displays the use of loading an image, blitting it fully and also blitting a subrectangle from it.
+Interactive demo showing all features.
 
 #### Local
 
 ```console
-cargo run --example smiley
-```
-
-### [Aseprite Animation](https://tversteeg.nl/blit/aseprite-animation/)
-
-Web: https://tversteeg.nl/blit/aseprite-animation/
-
-Uses the `["image", "aseprite"]` feature flags.
-
-Displays the use of using the `AnimationBuffer` and `Animation` structs to create a simple time based animation.
-
-#### Local
-
-```console
-cargo run --example aseprite-animation
-```
- 
-### [Aseprite 9 Slice](https://tversteeg.nl/blit/aseprite-9slice/)
-
-Web: https://tversteeg.nl/blit/aseprite-9slice/
-
-Uses the `["image", "aseprite"]` feature flags.
-
-#### Local
-
-```console
-cargo run --example aseprite-9slice
+cargo run --example showcase
 ```
 
 ![Example](img/example.png?raw=true)
-
-## Example Code
-
-Uses the `["image"]` feature flag:
-
-```toml
-[dependencies]
-blit = { version = "0.7", features = ["image"] }
-```
-
-```rust
-use blit::BlitExt;
-
-const WIDTH: usize = 180;
-const HEIGHT: usize = 180;
-const MASK_COLOR: u32 = 0xFF00FF;
-
-// The target buffer the image will be blit to
-let mut buffer: Vec<u32> = vec![0xFFFFFFFF; WIDTH * HEIGHT];
-
-// Open the example image using the image crate
-let img = image::open("examples/smiley.png").unwrap().into_rgb8();
-
-// Convert the image to a blit buffer
-let blit_buffer = img_rgb.to_blit_buffer(Color::from_u32(MASK_COLOR));
-
-// Blit the image twice to the buffer
-let pos = (10, 10);
-blit_buffer.blit(&mut buffer, WIDTH, pos);
-let pos = (20, 20);
-blit_buffer.blit(&mut buffer, WIDTH, pos);
-```

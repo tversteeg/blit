@@ -108,12 +108,8 @@ jobs:
           save-if: ${{ github.event_name == 'push' }}
 
       # Build the WASM examples
-      - name: Build Aseprite 9 Slice example
-        run: cargo run --package run-wasm -- --release --build-only --example aseprite-9slice
-      - name: Build Aseprite Animation example
-        run: cargo run --package run-wasm -- --release --build-only --example aseprite-animation
-      - name: Build Smiley example
-        run: cargo run --package run-wasm -- --release --build-only --example smiley
+      - name: Build Showcase example
+        run: cargo run --package run-wasm -- --release --build-only --example showcase
 
       # Deploy to GitHub pages
       - name: Deploy to GitHub Pages

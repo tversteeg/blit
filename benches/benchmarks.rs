@@ -1,65 +1,79 @@
-use blit::{Blit, BlitExt};
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use blit::{Blit, BlitOptions, Size, ToBlitBuffer};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion_perf_events::Perf;
+use perfcnt::linux::{HardwareEventType, PerfCounterBuilderLinux};
 
-const SIZE: usize = 1000;
-const ITERATIONS: i32 = 10;
+const SIZE: usize = 300;
 
-fn criterion_benchmark(c: &mut Criterion) {
-    let rgb = image::load_from_memory(include_bytes!("../examples/smiley/smiley_rgb.png"))
+fn criterion_benchmark(c: &mut Criterion<Perf>) {
+    let rgb = image::load_from_memory(include_bytes!("../examples/showcase/smiley_rgb.png"))
         .unwrap()
         .into_rgb8();
-    let rgba = image::load_from_memory(include_bytes!("../examples/smiley/smiley_rgba.png"))
-        .unwrap()
-        .into_rgba8();
 
-    let blit = rgb.to_blit_buffer_with_mask_color(0xFF_00_FF);
+    let blit = rgb.to_blit_buffer_with_mask_color(0xFF_00_FF).unwrap();
     let size = blit.size();
 
-    c.bench_function("blit", |b| {
-        let mut buffer: Vec<u32> = vec![0; SIZE * SIZE];
+    let mut group = c.benchmark_group("blit position");
+    for x in [
+        -(size.width as i32),
+        -(size.width as i32) / 2,
+        0,
+        SIZE as i32 / 2,
+        SIZE as i32 - size.width as i32 / 2,
+        SIZE as i32,
+    ] {
+        let options = BlitOptions::new_position(x, 0);
 
-        b.iter(|| {
-            for x in 0..ITERATIONS {
-                blit.blit(&mut buffer, SIZE, black_box((x * 100, 0)));
-            }
+        group.bench_with_input(BenchmarkId::from_parameter(x), &options, |b, options| {
+            let mut buffer: Vec<u32> = vec![0; SIZE * SIZE];
+
+            b.iter(|| blit.blit(&mut buffer, black_box(Size::new(SIZE, SIZE)), options));
         });
-    });
+    }
+    group.finish();
 
-    c.bench_function("blit sub rect", |b| {
-        let mut buffer: Vec<u32> = vec![0; SIZE * SIZE];
+    let mut group = c.benchmark_group("blit sub rect");
+    for x in [
+        -(size.width as i32),
+        -(size.width as i32) / 2,
+        0,
+        SIZE as i32 / 2,
+        SIZE as i32 - size.width as i32 / 2,
+        SIZE as i32,
+    ] {
+        let options =
+            BlitOptions::new_position(x, 0).with_sub_rect((0, 0, size.width / 2, size.height / 2));
 
-        b.iter(|| {
-            for x in 0..ITERATIONS {
-                blit.blit_subrect(
-                    &mut buffer,
-                    SIZE,
-                    black_box((x * 100, 0)),
-                    black_box((0, 0, size.0, size.1)),
-                );
-            }
+        group.bench_with_input(BenchmarkId::from_parameter(x), &options, |b, options| {
+            let mut buffer: Vec<u32> = vec![0; SIZE * SIZE];
+
+            b.iter(|| blit.blit(&mut buffer, black_box(Size::new(SIZE, SIZE)), options));
         });
-    });
+    }
+    group.finish();
 
     c.bench_function("blit exact fit", |b| {
-        let mut buffer: Vec<u32> = vec![0; (size.0 * size.1) as usize];
+        let mut buffer: Vec<u32> = vec![0; size.pixels()];
 
         b.iter(|| {
-            blit.blit(&mut buffer, size.0 as usize, (0, 0));
+            blit.blit(
+                &mut buffer,
+                black_box(Size::new(SIZE, SIZE)),
+                black_box(&BlitOptions::new_position(0, 0)),
+            );
         });
     });
 
     c.bench_function("load img with mask", |b| {
         b.iter(|| {
-            rgb.to_blit_buffer_with_mask_color(0xFF_00_FF);
-        });
-    });
-
-    c.bench_function("load img with alpha", |b| {
-        b.iter(|| {
-            rgba.to_blit_buffer_with_alpha(127);
+            rgb.to_blit_buffer_with_mask_color(0xFF_00_FF).unwrap();
         });
     });
 }
 
-criterion_group!(benches, criterion_benchmark);
+criterion_group!(
+    name = benches;
+    config = Criterion::default().with_measurement(Perf::new(PerfCounterBuilderLinux::from_hardware_event(HardwareEventType::Instructions)));
+    targets = criterion_benchmark
+);
 criterion_main!(benches);

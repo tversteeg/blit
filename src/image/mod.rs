@@ -1,17 +1,18 @@
 use std::ops::Deref;
 
 use image::{ImageBuffer, Pixel};
+
 use num_traits::ToPrimitive;
 use palette::{rgb::channels::Argb, Packed};
 
-use crate::{BlitBuffer, BlitExt, Color};
+use crate::{error::Result, BlitBuffer, Color, ToBlitBuffer};
 
-impl<P, Container> BlitExt for ImageBuffer<P, Container>
+impl<P, Container> ToBlitBuffer for ImageBuffer<P, Container>
 where
     P: Pixel,
     Container: Deref<Target = [P::Subpixel]>,
 {
-    fn to_blit_buffer_with_mask_color<C>(&self, mask_color: C) -> BlitBuffer
+    fn to_blit_buffer_with_mask_color<C>(&self, mask_color: C) -> Result<BlitBuffer>
     where
         C: Into<Packed<Argb>>,
     {
@@ -36,12 +37,12 @@ where
                     pixel
                 }
             }),
-            width as i32,
+            width,
             127,
         )
     }
 
-    fn to_blit_buffer_with_alpha(&self, alpha_treshold: u8) -> BlitBuffer {
+    fn to_blit_buffer_with_alpha(&self, alpha_treshold: u8) -> Result<BlitBuffer> {
         let (width, _height) = self.dimensions();
 
         BlitBuffer::from_iter(
@@ -54,7 +55,7 @@ where
                     ToPrimitive::to_u64(&pixel[2]).unwrap_or(0x0),
                 )
             }),
-            width as i32,
+            width,
             alpha_treshold,
         )
     }

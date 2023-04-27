@@ -40,7 +40,6 @@ image = { version = "0.24.6", optional = true, default-features = false, feature
 
 [dev-dependencies]
 serde_json = "1.0.96"
-softbuffer = "0.2.0"
 winit = "0.28.3"
 log = "0.4.17"
 web-time = "0.2.0"
@@ -48,8 +47,10 @@ pixels = "0.12.1"
 bytemuck = "1.13.1"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-criterion = "0.4.0"
+criterion = { version = "0.4.0", features = ["html_reports"] }
 pollster = "0.3.0"
+criterion-perf-events = "0.3.0"
+perfcnt = "0.8.0"
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 web-sys = { version = "0.3.61", features = ["CanvasRenderingContext2d", "Document", "Element", "HtmlCanvasElement", "ImageData", "Window"] }
@@ -58,16 +59,8 @@ wasm-bindgen-futures = "0.4.34"
 console_log = { version = "1.0.0", features = ["wasm-bindgen", "color"] }
 
 [[example]]
-name = "smiley"
+name = "showcase"
 required-features = ["image"]
-
-[[example]]
-name = "aseprite-animation"
-required-features = ["aseprite", "image"]
-
-[[example]]
-name = "aseprite-9slice"
-required-features = ["aseprite", "image"]
 
 [[bench]]
 name = "benchmarks"
