@@ -1,14 +1,11 @@
-use std::{num::NonZeroU32, ops::Deref};
+use std::ops::Deref;
 
 use image::{ImageBuffer, Pixel};
-use imgref::ImgVec;
+
 use num_traits::ToPrimitive;
 use palette::{rgb::channels::Argb, Packed};
 
-use crate::{
-    error::{Error, Result},
-    BlitBuffer, Color, ToBlitBuffer,
-};
+use crate::{error::Result, BlitBuffer, Color, ToBlitBuffer};
 
 impl<P, Container> ToBlitBuffer for ImageBuffer<P, Container>
 where

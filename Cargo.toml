@@ -30,7 +30,6 @@ num-traits = "0.2.15"
 aseprite = { optional = true, git = "https://github.com/ggez/aseprite" }
 palette = "0.6.1"
 thiserror = "1.0.40"
-imgref = "1.9.4"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 image = { version = "0.24.6", optional = true }

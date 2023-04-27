@@ -33,14 +33,18 @@ fn frame0(dst: &mut [u32], _buf: &BlitBuffer, font: &BlitBuffer, _mouse: (i32, i
 fn frame1(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32)) {
     let (center_x, center_y) = (DST_SIZE / 2 - buf.size() / 2).as_tuple();
 
-    buf.blit(dst, DST_SIZE, &BlitOptions::new(center_x, center_y));
-    buf.blit(dst, DST_SIZE, &BlitOptions::from_tuple(mouse));
+    buf.blit(
+        dst,
+        DST_SIZE,
+        &BlitOptions::new_position(center_x, center_y),
+    );
+    buf.blit(dst, DST_SIZE, &BlitOptions::new_position_tuple(mouse));
 
     draw_text(dst, font, 0, "Blit the full sprite");
     draw_text(
         dst,
         font,
-        DST_SIZE.height - CHAR_SIZE.width,
+        DST_SIZE.height - CHAR_SIZE.height,
         "BlitOptions::new(position)",
     );
 }
@@ -54,7 +58,8 @@ fn frame2(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32
     buf.blit(
         dst,
         DST_SIZE,
-        &BlitOptions::new(center_x, center_y).with_sub_rect(SubRect::from_size(sprite_size)),
+        &BlitOptions::new_position(center_x, center_y)
+            .with_sub_rect(SubRect::from_size(sprite_size)),
     );
 
     draw_text(
@@ -66,7 +71,7 @@ fn frame2(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32
     draw_text(
         dst,
         font,
-        (DST_SIZE - CHAR_SIZE).height as i32 * 2,
+        DST_SIZE.height - CHAR_SIZE.height * 2,
         "BlitOptions::new(position)\n\t.with_area((mouse_x, height))",
     );
 }
@@ -80,7 +85,8 @@ fn frame3(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32
     buf.blit(
         dst,
         DST_SIZE,
-        &BlitOptions::new(center_x, center_y).with_sub_rect(SubRect::from_size(sprite_size)),
+        &BlitOptions::new_position(center_x, center_y)
+            .with_sub_rect(SubRect::from_size(sprite_size)),
     );
 
     draw_text(
@@ -92,7 +98,7 @@ fn frame3(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32
     draw_text(
         dst,
         font,
-        (DST_SIZE - CHAR_SIZE).height as i32 * 2,
+        DST_SIZE.height - CHAR_SIZE.height * 2,
         "BlitOptions::new(position)\n\t.with_sub_rect((0, 0, width, mouse_y))",
     );
 }
@@ -105,7 +111,7 @@ fn frame4(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32
     buf.blit(
         dst,
         DST_SIZE,
-        &BlitOptions::new(center_x, center_y).with_sub_rect(SubRect::new(
+        &BlitOptions::new_position(center_x, center_y).with_sub_rect(SubRect::new(
             (mouse.0 - center_x as i32).clamp(0, src_size.width as i32),
             (mouse.1 - center_y as i32).clamp(0, src_size.height as i32),
             src_size,
@@ -121,7 +127,7 @@ fn frame4(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32
     draw_text(
         dst,
         font,
-        (DST_SIZE - CHAR_SIZE).height * 4,
+        DST_SIZE.height - CHAR_SIZE.height * 4,
         "BlitOptions::new(position)\n\t.with_sub_rect(\n\t\t(mouse_x, mouse_y, w/2, h/2)\n\t)",
     );
 }
@@ -133,7 +139,7 @@ fn frame5(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32
     buf.blit(
         dst,
         DST_SIZE,
-        &BlitOptions::new(offset_x, offset_y).with_area(Size::new(
+        &BlitOptions::new_position(offset_x, offset_y).with_area(Size::new(
             (mouse.0 - offset_x).max(1),
             (mouse.1 - offset_y).max(1),
         )),
@@ -148,7 +154,7 @@ fn frame5(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32
     draw_text(
         dst,
         font,
-        (DST_SIZE - CHAR_SIZE).height * 2,
+        DST_SIZE.height - CHAR_SIZE.height * 2,
         "BlitOptions::new(position)\n\t.with_area(mouse)",
     );
 }
@@ -160,7 +166,7 @@ fn frame6(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32
     buf.blit(
         dst,
         DST_SIZE,
-        &BlitOptions::new(offset_x, offset_y)
+        &BlitOptions::new_position(offset_x, offset_y)
             .with_area(Size::new(
                 (mouse.0 - offset_x).max(1) as u32,
                 (mouse.1 - offset_y).max(1) as u32,
@@ -177,7 +183,7 @@ fn frame6(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32
     draw_text(
         dst,
         font,
-        (DST_SIZE - CHAR_SIZE).height * 3,
+        DST_SIZE.height - CHAR_SIZE.height * 3,
         "BlitOptions::new(position)\n\t.with_area(mouse)\n\t.with_sub_rect((0, 70, 34, 32))",
     );
 }
@@ -214,7 +220,7 @@ fn draw_text(dst: &mut [u32], font: &BlitBuffer, y: impl ToPrimitive, text: &str
         font.blit(
             dst,
             DST_SIZE,
-            &BlitOptions::new(x, y).with_sub_rect(SubRect::new(char_offset, 0, CHAR_SIZE)),
+            &BlitOptions::new_position(x, y).with_sub_rect(SubRect::new(char_offset, 0, CHAR_SIZE)),
         );
     });
 }

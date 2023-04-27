@@ -16,7 +16,7 @@
 //! };
 //!
 //! // Although you probably want
-//! BlitOptions::slice9((x, y), 3, 6, 3, 6);
+//! BlitOptions::new_slice9(x, y, 3, 6, 3, 6);
 //! ```
 
 /// Divide the source buffer into multiple sections and repeat the chosen section to fill the area.
@@ -46,7 +46,7 @@ impl Slice {
     ///
     /// When horizontal this is the top section.
     /// When vertical this is the left section.
-    pub fn binary_first(split: u32) -> Self {
+    pub const fn binary_first(split: u32) -> Self {
         Self::Binary {
             split,
             repeat: BinarySection::First,
@@ -57,7 +57,7 @@ impl Slice {
     ///
     /// When horizontal this is the bottom section.
     /// When vertical this is the right section.
-    pub fn binary_last(split: u32) -> Self {
+    pub const fn binary_last(split: u32) -> Self {
         Self::Binary {
             split,
             repeat: BinarySection::Last,
@@ -68,7 +68,7 @@ impl Slice {
     ///
     /// When horizontal this is the top section.
     /// When vertical this is the left section.
-    pub fn ternary_first(split_first: u32, split_last: u32) -> Self {
+    pub const fn ternary_first(split_first: u32, split_last: u32) -> Self {
         Self::Ternary {
             split_first,
             split_last,
@@ -79,7 +79,7 @@ impl Slice {
     /// Create a ternary split where the last section is chosen.
     ///
     /// With both horizontal and vertical this is the middle section.
-    pub fn ternary_middle(split_first: u32, split_last: u32) -> Self {
+    pub const fn ternary_middle(split_first: u32, split_last: u32) -> Self {
         Self::Ternary {
             split_first,
             split_last,
@@ -91,7 +91,7 @@ impl Slice {
     ///
     /// When horizontal this is the bottom section.
     /// When vertical this is the right section.
-    pub fn ternary_last(split_first: u32, split_last: u32) -> Self {
+    pub const fn ternary_last(split_first: u32, split_last: u32) -> Self {
         Self::Ternary {
             split_first,
             split_last,

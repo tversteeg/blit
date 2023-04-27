@@ -6,27 +6,25 @@
 //!
 //! ```
 //! # #[cfg(feature = "image")] mod test {
-//! use blit::{Blit, ToBlitBuffer};
+//! use blit::{Blit, ToBlitBuffer, BlitOptions, Size};
 //!
-//! const WIDTH: usize = 180;
-//! const HEIGHT: usize = 180;
+//! const CANVAS_SIZE: Size = Size { width: 180, height: 180 };
 //! const MASK_COLOR: u32 = 0xFF_00_FF;
-//! # fn main() {
+
+//! # fn main() -> Result<(), blit::Error> {
 //! // Create a buffer in which we'll draw our image
-//! let mut buffer: Vec<u32> = vec![0xFF_FF_FF_FF; WIDTH * HEIGHT];
+//! let mut canvas: Vec<u32> = vec![0xFF_FF_FF_FF; CANVAS_SIZE.pixels()];
 //!
 //! // Load the image from disk using the `image` crate
 //! let img = image::open("examples/smiley_rgb.png").unwrap().into_rgb8();
 //!
 //! // Blit by creating a special blitting buffer first where the MASK_COLOR will be the color that will be made transparent
-//! let blit_buffer = img.to_blit_buffer_with_mask_color(MASK_COLOR);
+//! let blit_buffer = img.to_blit_buffer_with_mask_color(MASK_COLOR)?;
 //!
 //! // Draw the image 2 times to the buffer
-//! let pos = (10, 10);
-//! blit_buffer.blit(&mut buffer, WIDTH, pos);
-//! let pos = (20, 20);
-//! blit_buffer.blit(&mut buffer, WIDTH, pos);
-//! # }}
+//! blit_buffer.blit(&mut canvas, CANVAS_SIZE, &BlitOptions::new_position(10, 10));
+//! blit_buffer.blit(&mut canvas, CANVAS_SIZE, &BlitOptions::new_position(20, 20));
+//! # Ok(()) }}
 //! ```
 
 #[cfg(feature = "aseprite")]
@@ -49,10 +47,12 @@ pub mod prelude {
     pub use crate::{Blit, BlitBuffer};
 }
 
+pub use error::Error;
+pub use geom::{Size, SubRect};
+
 use std::ops::Range;
 
-use error::{Error, Result};
-pub use geom::{Size, SubRect};
+use error::Result;
 use num_traits::ToPrimitive;
 use palette::{rgb::channels::Argb, Packed};
 #[cfg(feature = "serde")]
@@ -62,6 +62,14 @@ use view::ImageView;
 
 /// Internal representation of a color.
 type Color = u32;
+
+/// Blit functions that can be called from multiple places.
+pub trait Blit {
+    /// Draw the source input on the destination image.
+    ///
+    /// See [`BlitOptions`] for multiple ways of drawing the image.
+    fn blit(&self, dst: &mut [u32], dst_size: Size, options: &BlitOptions);
+}
 
 /// Add blitting functions to external image types.
 ///
@@ -128,9 +136,11 @@ impl BlitOptions {
     /// Setup options for blitting at position `(x, y)`.
     ///
     /// When no other fields are changed or methods are called this will render the full source.
-    pub fn new<P>(x: P, y: P) -> Self
+    #[must_use]
+    pub fn new_position<X, Y>(x: X, y: Y) -> Self
     where
-        P: ToPrimitive,
+        X: ToPrimitive,
+        Y: ToPrimitive,
     {
         let (x, y) = (x.to_i32().unwrap_or(0), y.to_i32().unwrap_or(0));
 
@@ -144,9 +154,11 @@ impl BlitOptions {
     /// Setup options for blitting at position `(x, y)`.
     ///
     /// When no other fields are changed or methods are called this will render the full source.
-    pub fn from_tuple<P>((x, y): (P, P)) -> Self
+    #[must_use]
+    pub fn new_position_tuple<X, Y>((x, y): (X, Y)) -> Self
     where
-        P: ToPrimitive,
+        X: ToPrimitive,
+        Y: ToPrimitive,
     {
         let (x, y) = (x.to_i32().unwrap_or(0), y.to_i32().unwrap_or(0));
 
@@ -167,7 +179,8 @@ impl BlitOptions {
     /// - [`BlitOptions::horizontal_slices`].
     ///
     /// All other fields will be set to [`BlitOptions::default()`].
-    pub fn slice9<P>(
+    #[must_use]
+    pub fn new_slice9<P>(
         x: P,
         y: P,
         slice_left: u32,
@@ -178,7 +191,7 @@ impl BlitOptions {
     where
         P: ToPrimitive,
     {
-        Self::new(x.to_i32().unwrap_or(0), y.to_i32().unwrap_or(0)).with_slice9(
+        Self::new_position(x.to_i32().unwrap_or(0), y.to_i32().unwrap_or(0)).with_slice9(
             slice_left,
             slice_right,
             slice_top,
@@ -194,8 +207,12 @@ impl BlitOptions {
     /// # Sets field(s)
     ///
     /// - [`BlitOptions::area`]
-    pub fn with_area(mut self, area: Size) -> Self {
-        self.set_area(area);
+    #[must_use]
+    pub fn with_area<S>(mut self, area: S) -> Self
+    where
+        S: Into<Size>,
+    {
+        self.set_area(area.into());
 
         self
     }
@@ -211,8 +228,12 @@ impl BlitOptions {
     ///
     /// - [`BlitOptions::sub_rect`]
     /// - [`BlitOptions::area`] to `(width, height)` if it's `None`
-    pub fn with_sub_rect(mut self, sub_rect: SubRect) -> Self {
-        self.set_sub_rect(sub_rect);
+    #[must_use]
+    pub fn with_sub_rect<R>(mut self, sub_rect: R) -> Self
+    where
+        R: Into<SubRect>,
+    {
+        self.set_sub_rect(sub_rect.into());
 
         self
     }
@@ -223,6 +244,7 @@ impl BlitOptions {
     ///
     /// - [`BlitOptions::vertical_slices`]
     /// - [`BlitOptions::horizontal_slices`].
+    #[must_use]
     pub fn with_slice9(
         mut self,
         slice_left: u32,
@@ -260,7 +282,10 @@ impl BlitOptions {
     /// Get the destination area `(width, height)`.
     ///
     /// If [`BlitOptions::area`] is `None` the size of the source will be returned.
-    pub fn area(&self, source_size: Size) -> Size {
+    pub fn area<S>(&self, source_size: S) -> Size
+    where
+        S: Into<Size>,
+    {
         self.area.unwrap_or(source_size.into())
     }
 
@@ -275,7 +300,11 @@ impl BlitOptions {
     ///
     /// - [`BlitOptions::sub_rect`]
     /// - [`BlitOptions::area`] to `(width, height)` if it's `None`
-    pub fn set_sub_rect(&mut self, sub_rect: SubRect) {
+    pub fn set_sub_rect<R>(&mut self, sub_rect: R)
+    where
+        R: Into<SubRect>,
+    {
+        let sub_rect = sub_rect.into();
         self.sub_rect = Some(sub_rect);
 
         // Don't tile the image when only the subrectangle is set
@@ -288,7 +317,10 @@ impl BlitOptions {
     ///
     /// - If [`BlitOptions::sub_rect`] is `None` the size of the source will be returned with `(0, 0)` as the position.
     /// - If [`BlitOptions::sub_rect`] and [`BlitOptions::area`] are set it, the `width` and `height` will be shrunk to match those of the area.
-    pub fn sub_rect(&self, source_size: Size) -> SubRect {
+    pub fn sub_rect<S>(&self, source_size: S) -> SubRect
+    where
+        S: Into<Size>,
+    {
         // Get the sub rectangle defined or from the source
         let mut sub_rect = self
             .sub_rect
@@ -313,14 +345,12 @@ impl BlitOptions {
     /// # Sets field(s)
     ///
     /// - [`BlitOptions::area`]
-    pub fn set_area(&mut self, area: Size) {
+    pub fn set_area<S>(&mut self, area: S)
+    where
+        S: Into<Size>,
+    {
         self.area = Some(area.into());
     }
-}
-
-/// Blit functions that can be called from multiple places.
-pub trait Blit {
-    fn blit(&self, dst: &mut [u32], dst_size: Size, options: &BlitOptions);
 }
 
 /// A data structure holding a color and a mask buffer to make blitting on a buffer real fast.
@@ -339,6 +369,7 @@ impl BlitBuffer {
     ///
     /// It's assumed that the alpha channel in the resulting pixel is properly set.
     /// The alpha treshold is the offset point at which an alpha value will be used as either a transparent pixel or a colored one.
+    #[must_use]
     pub fn from_buffer<S>(src: &[Color], width: S, alpha_treshold: u8) -> Result<Self>
     where
         S: ToPrimitive,
@@ -350,6 +381,7 @@ impl BlitBuffer {
     ///
     /// It's assumed that the alpha channel in the resulting pixel is properly set.
     /// The alpha treshold is the offset point at which an alpha value will be used as either a transparent pixel or a colored one.
+    #[must_use]
     pub fn from_iter<I, S>(iter: I, width: S, alpha_treshold: u8) -> Result<Self>
     where
         I: Iterator<Item = Color>,
@@ -412,11 +444,6 @@ impl BlitBuffer {
         });
     }
 
-    /// Get a horizontal view based on this whole image.
-    fn view(&self) -> ImageView {
-        ImageView::full(self.size)
-    }
-
     /// Blit a single pixel.
     ///
     /// The main logic of calculating the resulting color that needs to be drawn.
@@ -436,20 +463,20 @@ impl BlitBuffer {
 impl Blit for BlitBuffer {
     fn blit(&self, dst: &mut [u32], dst_size: Size, options: &BlitOptions) {
         // Convert the destination to view so we can calculate with it
-        let dst = ImageView::full(dst_size);
+        let dst_view = ImageView::full(dst_size);
 
         // Convert our source to a view
-        let src = ImageView::full(self.size);
+        let src_view = ImageView::full(self.size);
 
         // Find a view on the dst based on the area
         let area = options.area(self.size);
-        let dst_area = match dst.sub_i32(options.x, options.y, area) {
+        let dst_area = match dst_view.sub_i32(options.x, options.y, area) {
             Some(dst_area) => dst_area,
             None => return,
         };
 
         // Another view based on the subrectangle
-        let sub_rect_view = match src.sub(options.sub_rect(self.size)) {
+        let sub_rect_view = match src_view.sub(options.sub_rect(self.size)) {
             Some(sub_rect_view) => sub_rect_view,
             None => return,
         };
@@ -458,13 +485,62 @@ impl Blit for BlitBuffer {
         if sub_rect_view.size() == area {
             // Pixel range of the source
             sub_rect_view
-                .parent_ranges_iter(src.width() as usize)
+                .parent_ranges_iter(self.size)
                 // Zipped with pixel range of the destination
-                .zip(dst_area.parent_ranges_iter(dst_size.width as usize))
-                .for_each(|range| todo!());
-        }
+                .zip(dst_area.parent_ranges_iter(dst_size))
+                .for_each(|(src_range, dst_range)| self.blit_horizontal(dst, dst_range, src_range));
+        } else {
+            // Recursively call this function with a new area defined by the sub rectangle to tile
 
-        dbg!(dst_area);
+            // Amount of tiles we need to fully render
+            let tiles = area / sub_rect_view.size();
+            let remainder = area % sub_rect_view.size();
+
+            for tile_x in 0..tiles.width {
+                // Fully render the filled tiles
+                for tile_y in 0..tiles.height {
+                    let options = BlitOptions::new_position(
+                        options.x + (tile_x * sub_rect_view.width()) as i32,
+                        options.y + (tile_y * sub_rect_view.height()) as i32,
+                    )
+                    .with_sub_rect(sub_rect_view.as_sub_rect());
+
+                    Self::blit(self, dst, dst_size, &options);
+                }
+
+                // Render the horizontal remainder
+                let options = BlitOptions::new_position(
+                    options.x + (tile_x * sub_rect_view.width()) as i32,
+                    options.y + (tiles.height * sub_rect_view.height()) as i32,
+                )
+                .with_sub_rect(sub_rect_view.as_sub_rect())
+                .with_area((sub_rect_view.width(), remainder.height));
+
+                Self::blit(self, dst, dst_size, &options);
+            }
+
+            // Render the vertical remainder
+            for tile_y in 0..tiles.height {
+                let options = BlitOptions::new_position(
+                    options.x + (tiles.width * sub_rect_view.width()) as i32,
+                    options.y + (tile_y * sub_rect_view.height()) as i32,
+                )
+                .with_sub_rect(sub_rect_view.as_sub_rect())
+                .with_area((remainder.width, sub_rect_view.height()));
+
+                Self::blit(self, dst, dst_size, &options);
+            }
+
+            // Render the single leftover remainder
+            let options = BlitOptions::new_position(
+                options.x + (tiles.width * sub_rect_view.width()) as i32,
+                options.y + (tiles.height * sub_rect_view.height()) as i32,
+            )
+            .with_sub_rect(sub_rect_view.as_sub_rect())
+            .with_area(remainder);
+
+            Self::blit(self, dst, dst_size, &options);
+        }
     }
 }
 
@@ -495,14 +571,14 @@ mod tests {
                 0xBB,
                 0xBB,
             ],
-            u32::new(2).unwrap(),
+            2,
             127,
         )
         .unwrap();
         blit.blit(
             &mut buffer,
-            Size::new(2, 3).unwrap(),
-            &BlitOptions::new((0, 0)),
+            Size::new(2, 3),
+            &BlitOptions::new_position(0, 0),
         );
 
         // Create a copy but cast the u32 to a i32

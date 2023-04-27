@@ -142,11 +142,11 @@ impl AnimationBlitBuffer {
 }
 
 impl Blit for AnimationBlitBuffer {
-    fn blit(&self, dst: &mut [u32], dst_size: Size, options: &BlitOptions) {
+    fn blit(&self, _dst: &mut [u32], _dst_size: Size, _options: &BlitOptions) {
         let frame = &self.info.frames[self.frame];
 
         // Area in the source to which this frame belongs
-        let frame_subrect = (
+        let _frame_subrect = (
             frame.frame.x as i32,
             frame.frame.y as i32,
             frame.frame.w as i32,

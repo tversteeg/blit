@@ -1,4 +1,4 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, Div, Mul, Rem, Sub};
 
 use num_traits::ToPrimitive;
 
@@ -29,19 +29,30 @@ impl Size {
         Self { width, height }
     }
 
+    /// Tuple of `(width, height)`.
+    pub const fn as_tuple(&self) -> (u32, u32) {
+        (self.width, self.height)
+    }
+
+    /// Amount of pixels.
+    pub const fn pixels(&self) -> usize {
+        self.width as usize * self.height as usize
+    }
+
     /// Calculate the size from the length of a buffer and the width.
-    pub(crate) fn from_len(len: usize, width: usize) -> Self {
-        Self::new(width as u32, (len / width) as u32)
+    pub(crate) const fn from_len(len: usize, width: usize) -> Self {
+        Self {
+            width: width as u32,
+            height: (len / width) as u32,
+        }
     }
 
     /// Set the size to the `min()` of another size.
     pub(crate) fn min(&self, other: Self) -> Self {
-        Self::new(self.width.min(other.width), self.height.min(other.height))
-    }
-
-    /// Tuple of `(width, height)`.
-    pub const fn as_tuple(&self) -> (u32, u32) {
-        (self.width, self.height)
+        Self {
+            width: self.width.min(other.width),
+            height: self.height.min(other.height),
+        }
     }
 }
 
@@ -130,33 +141,66 @@ impl<T: ToPrimitive> Div<T> for Size {
     }
 }
 
+impl Rem<Size> for Size {
+    type Output = Self;
+
+    fn rem(self, rhs: Size) -> Self::Output {
+        Self {
+            width: self.width % rhs.width,
+            height: self.height % rhs.height,
+        }
+    }
+}
+
+impl<T: ToPrimitive> Rem<T> for Size {
+    type Output = Self;
+
+    fn rem(self, rhs: T) -> Self::Output {
+        // Don't use 0 as a default otherwise we get a division by zero
+        let rhs = rhs.to_u32().unwrap_or_default();
+
+        Self {
+            width: self.width % rhs,
+            height: self.height % rhs,
+        }
+    }
+}
+
 /// Helper struct for defining sub rectangles.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SubRect {
     /// X offset in pixels.
-    pub x: u32,
+    pub x: i32,
     /// Y offset in pixels.
-    pub y: u32,
+    pub y: i32,
     /// Size of the rectangle in pixels.
     pub size: Size,
 }
 
 impl SubRect {
     /// Create a new sub-rectangle.
-    pub fn new<X, Y>(x: X, y: Y, size: Size) -> Self
+    pub fn new<X, Y, S>(x: X, y: Y, size: S) -> Self
     where
         X: ToPrimitive,
         Y: ToPrimitive,
+        S: Into<Size>,
     {
-        let x = x.to_u32().unwrap_or_default();
-        let y = y.to_u32().unwrap_or_default();
+        let x = x.to_i32().unwrap_or_default();
+        let y = y.to_i32().unwrap_or_default();
+        let size = size.into();
 
         Self { x, y, size }
     }
 
     /// Construct from a size with zero coordinates.
-    pub const fn from_size(size: Size) -> Self {
-        Self { x: 0, y: 0, size }
+    pub fn from_size<S>(size: S) -> Self
+    where
+        S: Into<Size>,
+    {
+        let (x, y) = (0, 0);
+        let size = size.into();
+
+        Self { x, y, size }
     }
 
     /// Width as `u32`.
@@ -170,17 +214,17 @@ impl SubRect {
     }
 
     /// Right position, `x + width`.
-    pub fn right(&self) -> u32 {
-        self.x + self.width()
+    pub fn right(&self) -> i32 {
+        self.x + self.width() as i32
     }
 
     /// Bottom position, `y + height`.
-    pub fn bottom(&self) -> u32 {
-        self.y + self.height()
+    pub fn bottom(&self) -> i32 {
+        self.y + self.height() as i32
     }
 
     /// `(x, y, width, height)` slice.
-    pub fn as_slice(&self) -> (u32, u32, u32, u32) {
+    pub fn as_slice(&self) -> (i32, i32, u32, u32) {
         (self.x, self.y, self.size.width, self.size.height)
     }
 }
@@ -193,8 +237,8 @@ where
     H: ToPrimitive,
 {
     fn from((x, y, width, height): (X, Y, W, H)) -> Self {
-        let x = x.to_u32().unwrap_or(0);
-        let y = y.to_u32().unwrap_or(0);
+        let x = x.to_i32().unwrap_or(0);
+        let y = y.to_i32().unwrap_or(0);
         let size = Size::from((width, height));
 
         Self { x, y, size }
