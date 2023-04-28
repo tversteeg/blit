@@ -190,6 +190,30 @@ fn frame6(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32
     );
 }
 
+/// Draw the full sprite as slice9 scaling.
+fn frame7(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32)) {
+    let (offset_x, offset_y) = (20, 20);
+
+    buf.blit(
+        dst,
+        DST_SIZE,
+        &BlitOptions::new_position(offset_x, offset_y)
+            .with_slice9(10, 30, 10, 30)
+            .with_area(Size::new(
+                (mouse.0 - offset_x).max(1),
+                (mouse.1 - offset_y).max(1),
+            )),
+    );
+
+    draw_text(dst, font, 0, "Scaling can be controlled with slices");
+    draw_text(
+        dst,
+        font,
+        DST_SIZE.height - CHAR_SIZE.height * 3,
+        "BlitOptions::new_slice9(position)\n\t.with_slice9(10, 30, 10, 30)\n\t.with_area(mouse)",
+    );
+}
+
 /// Draw an ASCII string.
 fn draw_text(dst: &mut [u32], font: &BlitBuffer, y: impl ToPrimitive, text: &str) {
     // First character in the image
@@ -281,8 +305,9 @@ async fn run() {
     let mut current_frame = 0;
 
     // All frame drawing functions, cycled by clicking
-    let frames: Vec<fn(&mut [u32], &BlitBuffer, &BlitBuffer, (i32, i32))> =
-        vec![frame0, frame1, frame2, frame3, frame4, frame5, frame6];
+    let frames: Vec<fn(&mut [u32], &BlitBuffer, &BlitBuffer, (i32, i32))> = vec![
+        frame0, frame1, frame2, frame3, frame4, frame5, frame6, frame7,
+    ];
 
     // Keep track of how long each frame takes to render
     event_loop.run(move |event, _, control_flow| {

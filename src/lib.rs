@@ -1,6 +1,6 @@
 //! Draw sprites quickly using a masking color or an alpha treshold.
 //!
-//! All colors can be constructed from the [`palette`](https://crates.io/crates/palette) crate or directly with an RGB `u32` where the alpha channel is ignored.
+//! All colors can be constructed directly with an RGB `u32` where the alpha channel is ignored or from any crate that does this for you.
 //!
 //! # Example
 //!
@@ -54,7 +54,6 @@ use std::ops::Range;
 
 use error::Result;
 use num_traits::ToPrimitive;
-use palette::{rgb::channels::Argb, Packed};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use slice::Slice;
@@ -86,7 +85,7 @@ pub trait ToBlitBuffer {
     /// Ignore the alpha channel if set and use only a single color for transparency.
     fn to_blit_buffer_with_mask_color<C>(&self, mask_color: C) -> Result<BlitBuffer>
     where
-        C: Into<Packed<Argb>>;
+        C: Into<u32>;
 }
 
 /// Sprite blitting options.
@@ -136,6 +135,11 @@ impl BlitOptions {
     /// Setup options for blitting at position `(x, y)`.
     ///
     /// When no other fields are changed or methods are called this will render the full source.
+    ///
+    /// # Sets field(s)
+    ///
+    /// - [`BlitOptions::x`]
+    /// - [`BlitOptions::y`]
     #[must_use]
     pub fn new_position<X, Y>(x: X, y: Y) -> Self
     where
@@ -154,6 +158,11 @@ impl BlitOptions {
     /// Setup options for blitting at position `(x, y)`.
     ///
     /// When no other fields are changed or methods are called this will render the full source.
+    ///
+    /// # Sets field(s)
+    ///
+    /// - [`BlitOptions::x`]
+    /// - [`BlitOptions::y`]
     #[must_use]
     pub fn new_position_tuple<X, Y>((x, y): (X, Y)) -> Self
     where
@@ -167,36 +176,6 @@ impl BlitOptions {
             y,
             ..Default::default()
         }
-    }
-
-    /// Draw as a scalable [9-slice graphic](https://en.wikipedia.org/wiki/9-slice_scaling).
-    ///
-    /// # Sets field(s)
-    ///
-    /// - [`BlitOptions::x`]
-    /// - [`BlitOptions::y`]
-    /// - [`BlitOptions::vertical_slices`]
-    /// - [`BlitOptions::horizontal_slices`].
-    ///
-    /// All other fields will be set to [`BlitOptions::default()`].
-    #[must_use]
-    pub fn new_slice9<P>(
-        x: P,
-        y: P,
-        slice_left: u32,
-        slice_right: u32,
-        slice_top: u32,
-        slice_bottom: u32,
-    ) -> Self
-    where
-        P: ToPrimitive,
-    {
-        Self::new_position(x.to_i32().unwrap_or(0), y.to_i32().unwrap_or(0)).with_slice9(
-            slice_left,
-            slice_right,
-            slice_top,
-            slice_bottom,
-        )
     }
 
     /// Set the size of the area `(width, height)` on the destination buffer.
@@ -252,8 +231,26 @@ impl BlitOptions {
         slice_top: u32,
         slice_bottom: u32,
     ) -> Self {
-        self.vertical_slices = Some(Slice::ternary_middle(slice_left, slice_right));
-        self.horizontal_slices = Some(Slice::ternary_middle(slice_top, slice_bottom));
+        self.vertical_slices = Some(Slice::ternary(slice_left, slice_right));
+        self.horizontal_slices = Some(Slice::ternary(slice_top, slice_bottom));
+
+        self
+    }
+
+    /// Set the render position on the target `(x, y)`.
+    ///
+    /// # Sets field(s)
+    ///
+    /// - [`BlitOptions::x`]
+    /// - [`BlitOptions::y`]
+    #[must_use]
+    pub fn with_position<X, Y>(mut self, x: X, y: Y) -> Self
+    where
+        X: ToPrimitive,
+        Y: ToPrimitive,
+    {
+        self.x = x.to_i32().unwrap_or_default();
+        self.y = y.to_i32().unwrap_or_default();
 
         self
     }
@@ -351,6 +348,39 @@ impl BlitOptions {
     {
         self.area = Some(area.into());
     }
+
+    /// Divide the target area into given slices of rectangles to draw.
+    pub(crate) fn slice_areas(&self, target_area: Size) -> Vec<SubRect> {
+        match (self.vertical_slices, self.horizontal_slices) {
+            // No slices, so no need to split it
+            (None, None) => vec![SubRect::new(self.x, self.y, target_area)],
+            (None, Some(horizontal)) => todo!(),
+            (Some(vertical), None) => todo!(),
+            // The buffer is split both horizontally and vertically
+            (Some(vertical), Some(horizontal)) => {
+                let horizontal_ranges = horizontal.divide_area(target_area.width);
+                let vertical_ranges = vertical.divide_area(target_area.height);
+
+                // Return a cartesian product of all ranges
+                vertical_ranges
+                    .into_iter()
+                    .flat_map(|vertical| {
+                        horizontal_ranges.iter().map(move |horizontal| {
+                            // Create a sub rectangle from a range pair
+                            SubRect::new(
+                                self.x + horizontal.0 as i32,
+                                self.y + vertical.0 as i32,
+                                Size::new(
+                                    self.x + (horizontal.1 - horizontal.0) as i32,
+                                    self.y + (vertical.1 - vertical.0) as i32,
+                                ),
+                            )
+                        })
+                    })
+                    .collect()
+            }
+        }
+    }
 }
 
 /// A data structure holding a color and a mask buffer to make blitting on a buffer real fast.
@@ -432,36 +462,8 @@ impl BlitBuffer {
         &mut self.data
     }
 
-    /// Blit a horizontal strip.
-    fn blit_horizontal(&self, dst: &mut [u32], dst_index: Range<usize>, blit_index: Range<usize>) {
-        // Same size iterators over both our buffer and the output buffer
-        let blit_iter = self.data[blit_index].iter();
-        let dst_iter = dst[dst_index].iter_mut();
-
-        // Blit each pixel
-        dst_iter.zip(blit_iter).for_each(|(dst_pixel, blit_pixel)| {
-            *dst_pixel = Self::blit_pixel(*dst_pixel, *blit_pixel);
-        });
-    }
-
-    /// Blit a single pixel.
-    ///
-    /// The main logic of calculating the resulting color that needs to be drawn.
-    #[inline(always)]
-    fn blit_pixel(dst_pixel: Color, blit_pixel: Color) -> Color {
-        // Set the pixel from the blit image if the mask value is set
-        if (blit_pixel >> 24) > 0 {
-            // Pixel from the blit buffer is not masked, use it
-            blit_pixel
-        } else {
-            // Pixel from the blit buffer is maskde, use the original color
-            dst_pixel
-        }
-    }
-}
-
-impl Blit for BlitBuffer {
-    fn blit(&self, dst: &mut [u32], dst_size: Size, options: &BlitOptions) {
+    /// Blit a sliced section.
+    fn blit_slice(&self, dst: &mut [u32], dst_size: Size, options: &BlitOptions) {
         // Convert the destination to view so we can calculate with it
         let dst_view = ImageView::full(dst_size);
 
@@ -505,7 +507,7 @@ impl Blit for BlitBuffer {
                     )
                     .with_sub_rect(sub_rect_view.as_sub_rect());
 
-                    Self::blit(self, dst, dst_size, &options);
+                    self.blit_slice(dst, dst_size, &options);
                 }
 
                 // Render the horizontal remainder
@@ -516,7 +518,7 @@ impl Blit for BlitBuffer {
                 .with_sub_rect(sub_rect_view.as_sub_rect())
                 .with_area((sub_rect_view.width(), remainder.height));
 
-                Self::blit(self, dst, dst_size, &options);
+                self.blit_slice(dst, dst_size, &options);
             }
 
             // Render the vertical remainder
@@ -528,7 +530,7 @@ impl Blit for BlitBuffer {
                 .with_sub_rect(sub_rect_view.as_sub_rect())
                 .with_area((remainder.width, sub_rect_view.height()));
 
-                Self::blit(self, dst, dst_size, &options);
+                self.blit_slice(dst, dst_size, &options);
             }
 
             // Render the single leftover remainder
@@ -539,8 +541,57 @@ impl Blit for BlitBuffer {
             .with_sub_rect(sub_rect_view.as_sub_rect())
             .with_area(remainder);
 
-            Self::blit(self, dst, dst_size, &options);
+            self.blit_slice(dst, dst_size, &options);
         }
+    }
+
+    /// Blit a horizontal strip.
+    fn blit_horizontal(&self, dst: &mut [u32], dst_index: Range<usize>, blit_index: Range<usize>) {
+        // Same size iterators over both our buffer and the output buffer
+        let blit_iter = self.data[blit_index].iter();
+        let dst_iter = dst[dst_index].iter_mut();
+
+        // Blit each pixel
+        dst_iter.zip(blit_iter).for_each(|(dst_pixel, blit_pixel)| {
+            *dst_pixel = Self::blit_pixel(*dst_pixel, *blit_pixel);
+        });
+    }
+
+    /// Blit a single pixel.
+    ///
+    /// The main logic of calculating the resulting color that needs to be drawn.
+    #[inline(always)]
+    fn blit_pixel(dst_pixel: Color, blit_pixel: Color) -> Color {
+        // Set the pixel from the blit image if the mask value is set
+        if (blit_pixel >> 24) > 0 {
+            // Pixel from the blit buffer is not masked, use it
+            blit_pixel
+        } else {
+            // Pixel from the blit buffer is masked, use the original color
+            dst_pixel
+        }
+    }
+}
+
+impl Blit for BlitBuffer {
+    fn blit(&self, dst: &mut [u32], dst_size: Size, options: &BlitOptions) {
+        // Get the total area we need to draw the slices in
+        let area = options.area(self.size);
+
+        // Loop over each slice
+        options
+            .slice_areas(area)
+            .into_iter()
+            .for_each(|slice_area| {
+                self.blit_slice(
+                    dst,
+                    dst_size,
+                    &options
+                        .clone()
+                        .with_position(slice_area.x, slice_area.y)
+                        .with_area(slice_area.size),
+                )
+            });
     }
 }
 
