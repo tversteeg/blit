@@ -19,6 +19,8 @@
 //! BlitOptions::new_slice9(x, y, 3, 6, 3, 6);
 //! ```
 
+use std::ops::Range;
+
 use crate::{Size, SubRect};
 
 /// Divide the source buffer into multiple sections and repeat the chosen section to fill the area.
@@ -77,9 +79,11 @@ impl Slice {
     }
 
     /// Divide the given single dimensional area by the slice ranges.
-    ///
-    /// The tuple returned has a pair of start and end pixels.
-    pub fn divide_area(&self, target_length: u32) -> Vec<(u32, u32)> {
+    pub(crate) fn divide_area_iter(
+        &self,
+        source_length: u32,
+        target_length: u32,
+    ) -> impl Iterator<Item = SliceProjection> {
         match self {
             Slice::Binary { split, repeat } => {
                 // Find the middle intersection depending on which part needs to scale
@@ -89,7 +93,13 @@ impl Slice {
                 }
                 .min(target_length);
 
-                vec![(0, middle), (middle, target_length)]
+                // The (0, 0) pair will be removed by the filter, we have to add this otherwise the compiler will complain about the iterators not being the same size
+                [
+                    (0, middle, 0, *split),
+                    (middle, target_length, *split, source_length),
+                    (0, 0, 0, 0),
+                ]
+                .into_iter()
             }
             Slice::Ternary {
                 split_first,
@@ -103,13 +113,26 @@ impl Slice {
                 let middle_first = middle_first.min(middle_second);
                 let middle_second = middle_second.clamp(middle_first, target_length);
 
-                vec![
-                    (0, middle_first),
-                    (middle_first, middle_second),
-                    (middle_second, target_length),
+                [
+                    (0, middle_first, 0, *split_first),
+                    (middle_first, middle_second, *split_first, *split_last),
+                    (middle_second, target_length, *split_last, source_length),
                 ]
+                .into_iter()
             }
         }
+        // Remove empty ranges
+        .filter(|(target_start, target_end, source_start, source_end)| {
+            target_start < target_end && source_start < source_end
+        })
+        .map(
+            |(target_start, target_end, source_start, source_end)| SliceProjection {
+                source_start,
+                source_end,
+                target_start,
+                target_end,
+            },
+        )
     }
 }
 
@@ -126,4 +149,49 @@ pub enum BinarySection {
     /// When horizontal this is the bottom section.
     /// When vertical this is the right section.
     Last,
+}
+
+/// How a slice must be rendered.
+#[derive(Debug, Clone)]
+pub(crate) struct SliceProjection {
+    /// Left part of the absolute range in the source buffer to take the image from.
+    pub source_start: u32,
+    /// Right part of the absolute range in the source buffer to take the image from.
+    pub source_end: u32,
+    /// Left part of the relative range in the destination buffer to draw into.
+    pub target_start: u32,
+    /// Right part of the relative range in the destination buffer to draw into.
+    pub target_end: u32,
+}
+
+impl SliceProjection {
+    /// The amount of pixels of the range.
+    pub fn source_amount(&self) -> u32 {
+        self.source_end - self.source_start
+    }
+
+    /// The amount of pixels of the range.
+    pub fn target_amount(&self) -> u32 {
+        self.target_end - self.target_start
+    }
+
+    /// Create a `(source, target)` rectangle tuple from horizontal and vertical projections.
+    pub fn combine_into_sub_rects(
+        horizontal: &SliceProjection,
+        vertical: &SliceProjection,
+    ) -> (SubRect, SubRect) {
+        let source = SubRect::new(
+            horizontal.source_start,
+            vertical.source_start,
+            Size::new(horizontal.source_amount(), vertical.source_amount()),
+        );
+
+        let target = SubRect::new(
+            horizontal.target_start,
+            vertical.target_start,
+            Size::new(horizontal.target_amount(), vertical.target_amount()),
+        );
+
+        (source, target)
+    }
 }

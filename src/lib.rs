@@ -27,8 +27,6 @@
 //! # Ok(()) }}
 //! ```
 
-#[cfg(feature = "aseprite")]
-pub mod aseprite;
 pub mod error;
 mod geom;
 #[cfg(feature = "image")]
@@ -56,7 +54,7 @@ use error::Result;
 use num_traits::ToPrimitive;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use slice::Slice;
+use slice::{Slice, SliceProjection};
 use view::ImageView;
 
 /// Internal representation of a color.
@@ -132,6 +130,14 @@ pub struct BlitOptions {
 }
 
 impl BlitOptions {
+    /// Setup options for blitting at position `(0, 0)`.
+    ///
+    /// When no other fields are changed or methods are called this will render the full source.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Setup options for blitting at position `(x, y)`.
     ///
     /// When no other fields are changed or methods are called this will render the full source.
@@ -231,8 +237,7 @@ impl BlitOptions {
         slice_top: u32,
         slice_bottom: u32,
     ) -> Self {
-        self.vertical_slices = Some(Slice::ternary(slice_left, slice_right));
-        self.horizontal_slices = Some(Slice::ternary(slice_top, slice_bottom));
+        self.set_slice9(slice_left, slice_right, slice_top, slice_bottom);
 
         self
     }
@@ -349,37 +354,21 @@ impl BlitOptions {
         self.area = Some(area.into());
     }
 
-    /// Divide the target area into given slices of rectangles to draw.
-    pub(crate) fn slice_areas(&self, target_area: Size) -> Vec<SubRect> {
-        match (self.vertical_slices, self.horizontal_slices) {
-            // No slices, so no need to split it
-            (None, None) => vec![SubRect::new(self.x, self.y, target_area)],
-            (None, Some(horizontal)) => todo!(),
-            (Some(vertical), None) => todo!(),
-            // The buffer is split both horizontally and vertically
-            (Some(vertical), Some(horizontal)) => {
-                let horizontal_ranges = horizontal.divide_area(target_area.width);
-                let vertical_ranges = vertical.divide_area(target_area.height);
-
-                // Return a cartesian product of all ranges
-                vertical_ranges
-                    .into_iter()
-                    .flat_map(|vertical| {
-                        horizontal_ranges.iter().map(move |horizontal| {
-                            // Create a sub rectangle from a range pair
-                            SubRect::new(
-                                self.x + horizontal.0 as i32,
-                                self.y + vertical.0 as i32,
-                                Size::new(
-                                    self.x + (horizontal.1 - horizontal.0) as i32,
-                                    self.y + (vertical.1 - vertical.0) as i32,
-                                ),
-                            )
-                        })
-                    })
-                    .collect()
-            }
-        }
+    /// Draw as a scalable [9-slice graphic](https://en.wikipedia.org/wiki/9-slice_scaling).
+    ///
+    /// # Sets field(s)
+    ///
+    /// - [`BlitOptions::vertical_slices`]
+    /// - [`BlitOptions::horizontal_slices`].
+    pub fn set_slice9(
+        &mut self,
+        slice_left: u32,
+        slice_right: u32,
+        slice_top: u32,
+        slice_bottom: u32,
+    ) {
+        self.vertical_slices = Some(Slice::ternary(slice_left, slice_right));
+        self.horizontal_slices = Some(Slice::ternary(slice_top, slice_bottom));
     }
 }
 
@@ -460,6 +449,38 @@ impl BlitBuffer {
     /// Get a mutable reference to the pixel data.
     pub fn pixels_mut(&mut self) -> &mut [Color] {
         &mut self.data
+    }
+
+    /// Divide the target area into given slices of rectangles to draw.
+    ///
+    /// A `(source, target)` rectangle tuple is returned.
+    fn slice_projections(
+        &self,
+        options: &BlitOptions,
+        target_area: Size,
+    ) -> Vec<(SubRect, SubRect)> {
+        match (options.vertical_slices, options.horizontal_slices) {
+            // No slices, so no need to split it
+            (None, None) => Vec::new(),
+            (None, Some(horizontal)) => todo!(),
+            (Some(vertical), None) => todo!(),
+            // The buffer is split both horizontally and vertically
+            (Some(vertical), Some(horizontal)) => {
+                let horizontal_ranges = horizontal
+                    .divide_area_iter(self.width(), target_area.width)
+                    .collect::<Vec<_>>();
+                let vertical_ranges = vertical.divide_area_iter(self.height(), target_area.height);
+
+                // Return a cartesian product of all ranges
+                vertical_ranges
+                    .flat_map(|vertical| {
+                        horizontal_ranges.iter().map(move |horizontal| {
+                            SliceProjection::combine_into_sub_rects(horizontal, &vertical)
+                        })
+                    })
+                    .collect()
+            }
+        }
     }
 
     /// Blit a sliced section.
@@ -578,20 +599,36 @@ impl Blit for BlitBuffer {
         // Get the total area we need to draw the slices in
         let area = options.area(self.size);
 
-        // Loop over each slice
-        options
-            .slice_areas(area)
-            .into_iter()
-            .for_each(|slice_area| {
-                self.blit_slice(
-                    dst,
-                    dst_size,
-                    &options
-                        .clone()
-                        .with_position(slice_area.x, slice_area.y)
-                        .with_area(slice_area.size),
-                )
+        // Which slices do we need to draw if any
+        let slice_projections = self.slice_projections(options, area);
+
+        if slice_projections.is_empty() {
+            // Render without projections
+            self.blit_slice(dst, dst_size, options);
+        } else {
+            // Loop over each slice
+            slice_projections.into_iter().for_each(|(source, target)| {
+                let mut slice_options = options
+                    .clone()
+                    // Move the position to which part of the slice we need to draw
+                    .with_position(options.x + target.x, options.y + target.y)
+                    .with_area(target.size);
+
+                // Set
+                if let Some(sub_rect) = options.sub_rect {
+                    slice_options.set_sub_rect((
+                        sub_rect.x + source.x,
+                        sub_rect.y + source.y,
+                        sub_rect.width(),
+                        sub_rect.height(),
+                    ))
+                } else {
+                    slice_options.set_sub_rect(source)
+                }
+
+                self.blit_slice(dst, dst_size, &slice_options)
             });
+        }
     }
 }
 
