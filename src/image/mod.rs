@@ -1,9 +1,7 @@
 use std::ops::Deref;
 
 use image::{ImageBuffer, Pixel};
-
 use num_traits::ToPrimitive;
-use palette::{rgb::channels::Argb, Packed};
 
 use crate::{error::Result, BlitBuffer, Color, ToBlitBuffer};
 
@@ -14,12 +12,12 @@ where
 {
     fn to_blit_buffer_with_mask_color<C>(&self, mask_color: C) -> Result<BlitBuffer>
     where
-        C: Into<Packed<Argb>>,
+        C: Into<u32>,
     {
         let (width, _height) = self.dimensions();
 
         // Remove the alpha channel
-        let mask_color = mask_color.into().color | 0xFF_00_00_00;
+        let mask_color = mask_color.into() | 0xFF_00_00_00;
 
         BlitBuffer::from_iter(
             self.pixels().map(|pixel| pixel.to_rgba()).map(|pixel| {

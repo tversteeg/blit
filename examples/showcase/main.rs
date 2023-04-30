@@ -27,12 +27,24 @@ const CHAR_SIZE: Size = Size {
 };
 
 /// Show the text for clicking.
-fn frame0(dst: &mut [u32], _buf: &BlitBuffer, font: &BlitBuffer, _mouse: (i32, i32)) {
+fn frame0(
+    dst: &mut [u32],
+    _buf: &BlitBuffer,
+    _scalable_buf: &BlitBuffer,
+    font: &BlitBuffer,
+    _mouse: (i32, i32),
+) {
     draw_text(dst, font, 0, "Go to the next showcase item by clicking\nthe left mouse button.\n\nGo to the previous showcase item by\nclicking the right mouse button.");
 }
 
 /// Draw the sprite completely.
-fn frame1(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32)) {
+fn frame1(
+    dst: &mut [u32],
+    buf: &BlitBuffer,
+    _scalable_buf: &BlitBuffer,
+    font: &BlitBuffer,
+    mouse: (i32, i32),
+) {
     let (center_x, center_y) = (DST_SIZE / 2 - buf.size() / 2).as_tuple();
 
     buf.blit(
@@ -47,12 +59,18 @@ fn frame1(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32
         dst,
         font,
         DST_SIZE.height - CHAR_SIZE.height,
-        "BlitOptions::new(position)",
+        "BlitOptions::new(mouse)",
     );
 }
 
 /// Draw the left half of the sprite using the area option.
-fn frame2(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32)) {
+fn frame2(
+    dst: &mut [u32],
+    buf: &BlitBuffer,
+    _scalable_buf: &BlitBuffer,
+    font: &BlitBuffer,
+    mouse: (i32, i32),
+) {
     let (center_x, center_y) = (DST_SIZE / 2 - buf.size() / 2).as_tuple();
     let mut sprite_size = buf.size();
     sprite_size.width = (mouse.0 - center_x as i32).clamp(0, buf.width() as i32) as u32;
@@ -79,7 +97,13 @@ fn frame2(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32
 }
 
 /// Draw the top half of the sprite by taking a sub rectangle from it.
-fn frame3(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32)) {
+fn frame3(
+    dst: &mut [u32],
+    buf: &BlitBuffer,
+    _scalable_buf: &BlitBuffer,
+    font: &BlitBuffer,
+    mouse: (i32, i32),
+) {
     let (center_x, center_y) = (DST_SIZE / 2 - buf.size() / 2).as_tuple();
     let mut sprite_size = buf.size();
     sprite_size.height = (mouse.1 - center_y as i32).clamp(0, buf.height() as i32) as u32;
@@ -106,7 +130,13 @@ fn frame3(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32
 }
 
 /// Draw the middle section of the sprite by taking a sub rectangle from it.
-fn frame4(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32)) {
+fn frame4(
+    dst: &mut [u32],
+    buf: &BlitBuffer,
+    _scalable_buf: &BlitBuffer,
+    font: &BlitBuffer,
+    mouse: (i32, i32),
+) {
     let src_size = buf.size() / 2;
     let (center_x, center_y) = (DST_SIZE / 2 - buf.size() / 2).as_tuple();
 
@@ -135,7 +165,13 @@ fn frame4(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32
 }
 
 /// Draw the full sprite tiled multiple times for each dimension.
-fn frame5(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32)) {
+fn frame5(
+    dst: &mut [u32],
+    buf: &BlitBuffer,
+    _scalable_buf: &BlitBuffer,
+    font: &BlitBuffer,
+    mouse: (i32, i32),
+) {
     let (offset_x, offset_y) = (20, 20);
 
     buf.blit(
@@ -162,7 +198,13 @@ fn frame5(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32
 }
 
 /// Draw a sub-rectangle of the sprite tiled multiple times for each dimension.
-fn frame6(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32)) {
+fn frame6(
+    dst: &mut [u32],
+    buf: &BlitBuffer,
+    _scalable_buf: &BlitBuffer,
+    font: &BlitBuffer,
+    mouse: (i32, i32),
+) {
     let (offset_x, offset_y) = (20, 20);
 
     buf.blit(
@@ -187,6 +229,41 @@ fn frame6(dst: &mut [u32], buf: &BlitBuffer, font: &BlitBuffer, mouse: (i32, i32
         font,
         DST_SIZE.height - CHAR_SIZE.height * 3,
         "BlitOptions::new(position)\n\t.with_area(mouse)\n\t.with_sub_rect((0, 70, 34, 32))",
+    );
+}
+
+/// Draw the full sprite as slice9 scaling.
+fn frame7(
+    dst: &mut [u32],
+    _buf: &BlitBuffer,
+    scalable_buf: &BlitBuffer,
+    font: &BlitBuffer,
+    mouse: (i32, i32),
+) {
+    let (offset_x, offset_y) = (20, 40);
+
+    scalable_buf.blit(
+        dst,
+        DST_SIZE,
+        &BlitOptions::new_position(offset_x, offset_y)
+            .with_slice9(10, 20, 10, 20)
+            .with_area(Size::new(
+                (mouse.0 - offset_x).max(1),
+                (mouse.1 - offset_y).max(1),
+            )),
+    );
+
+    draw_text(
+        dst,
+        font,
+        0,
+        "Which part of the sprite gets scaled can be\ncontrolled with slices, the most common and\nuseful is the 9 slice where the middle part\ngets scaled",
+    );
+    draw_text(
+        dst,
+        font,
+        DST_SIZE.height - CHAR_SIZE.height * 3,
+        "BlitOptions::new_position(position)\n\t.with_slice9(11, 17, 9, 13)\n\t.with_area(mouse)",
     );
 }
 
@@ -243,6 +320,13 @@ async fn run() {
         .to_blit_buffer_with_mask_color(MASK_COLOR)
         .unwrap();
 
+    // Load a scalable image with a mask color from disk
+    let scalable_buf = image::load_from_memory(include_bytes!("./9slice.png"))
+        .unwrap()
+        .into_rgba8()
+        .to_blit_buffer_with_alpha(127)
+        .unwrap();
+
     // Setup a winit window
     let event_loop = EventLoop::new();
     let size = LogicalSize::new(DST_SIZE.width as f64, DST_SIZE.height as f64);
@@ -281,8 +365,9 @@ async fn run() {
     let mut current_frame = 0;
 
     // All frame drawing functions, cycled by clicking
-    let frames: Vec<fn(&mut [u32], &BlitBuffer, &BlitBuffer, (i32, i32))> =
-        vec![frame0, frame1, frame2, frame3, frame4, frame5, frame6];
+    let frames: Vec<fn(&mut [u32], &BlitBuffer, &BlitBuffer, &BlitBuffer, (i32, i32))> = vec![
+        frame0, frame1, frame2, frame3, frame4, frame5, frame6, frame7,
+    ];
 
     // Keep track of how long each frame takes to render
     event_loop.run(move |event, _, control_flow| {
@@ -297,6 +382,7 @@ async fn run() {
                 frames[current_frame](
                     bytemuck::cast_slice_mut(pixels.frame_mut()),
                     &buf,
+                    &scalable_buf,
                     &font,
                     mouse,
                 );

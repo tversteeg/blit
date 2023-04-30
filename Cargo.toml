@@ -19,16 +19,13 @@ categories = [
 ]
 
 [features]
-default = ["image", "aseprite"]
+default = ["image"]
 image = ["dep:image"]
-aseprite = ["dep:aseprite"]
-serde = ["dep:serde", "palette/serializing"]
+serde = ["dep:serde"]
 
 [dependencies]
 serde = { version = "1.0.160", optional = true, features = ["derive"] }
 num-traits = "0.2.15"
-aseprite = { optional = true, git = "https://github.com/ggez/aseprite" }
-palette = "0.6.1"
 thiserror = "1.0.40"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
