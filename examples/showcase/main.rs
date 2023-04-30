@@ -240,7 +240,7 @@ fn frame7(
     font: &BlitBuffer,
     mouse: (i32, i32),
 ) {
-    let (offset_x, offset_y) = (20, 20);
+    let (offset_x, offset_y) = (20, 40);
 
     scalable_buf.blit(
         dst,
@@ -257,7 +257,7 @@ fn frame7(
         dst,
         font,
         0,
-        "Which part of the sprite gets scaled can be\ncontrolled with slices",
+        "Which part of the sprite gets scaled can be\ncontrolled with slices, the most common and\nuseful is the 9 slice where the middle part\ngets scaled",
     );
     draw_text(
         dst,

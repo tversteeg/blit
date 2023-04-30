@@ -329,12 +329,10 @@ impl BlitOptions {
             .unwrap_or_else(|| SubRect::from_size(source_size));
 
         // The sub rectangle is never allowed to be bigger than the area
-        let sub_rect_size = match self.area {
+        sub_rect.size = match self.area {
             Some(area) => sub_rect.size.min(area),
             None => sub_rect.size,
         };
-
-        sub_rect.size = sub_rect_size;
 
         sub_rect
     }
@@ -531,38 +529,44 @@ impl BlitBuffer {
                     self.blit_slice(dst, dst_size, &options);
                 }
 
-                // Render the horizontal remainder
-                let options = BlitOptions::new_position(
-                    options.x + (tile_x * sub_rect_view.width()) as i32,
-                    options.y + (tiles.height * sub_rect_view.height()) as i32,
-                )
-                .with_sub_rect(sub_rect_view.as_sub_rect())
-                .with_area((sub_rect_view.width(), remainder.height));
+                if remainder.height > 0 {
+                    // Render the horizontal remainder
+                    let options = BlitOptions::new_position(
+                        options.x + (tile_x * sub_rect_view.width()) as i32,
+                        options.y + (tiles.height * sub_rect_view.height()) as i32,
+                    )
+                    .with_sub_rect(sub_rect_view.as_sub_rect())
+                    .with_area((sub_rect_view.width(), remainder.height));
 
-                self.blit_slice(dst, dst_size, &options);
+                    self.blit_slice(dst, dst_size, &options);
+                }
             }
 
-            // Render the vertical remainder
-            for tile_y in 0..tiles.height {
-                let options = BlitOptions::new_position(
-                    options.x + (tiles.width * sub_rect_view.width()) as i32,
-                    options.y + (tile_y * sub_rect_view.height()) as i32,
-                )
-                .with_sub_rect(sub_rect_view.as_sub_rect())
-                .with_area((remainder.width, sub_rect_view.height()));
+            if remainder.width > 0 {
+                // Render the vertical remainder
+                for tile_y in 0..tiles.height {
+                    let options = BlitOptions::new_position(
+                        options.x + (tiles.width * sub_rect_view.width()) as i32,
+                        options.y + (tile_y * sub_rect_view.height()) as i32,
+                    )
+                    .with_sub_rect(sub_rect_view.as_sub_rect())
+                    .with_area((remainder.width, sub_rect_view.height()));
 
-                self.blit_slice(dst, dst_size, &options);
+                    self.blit_slice(dst, dst_size, &options);
+                }
+
+                if remainder.height > 0 {
+                    // Render the single leftover remainder
+                    let options = BlitOptions::new_position(
+                        options.x + (tiles.width * sub_rect_view.width()) as i32,
+                        options.y + (tiles.height * sub_rect_view.height()) as i32,
+                    )
+                    .with_sub_rect(sub_rect_view.as_sub_rect())
+                    .with_area(remainder);
+
+                    self.blit_slice(dst, dst_size, &options);
+                }
             }
-
-            // Render the single leftover remainder
-            let options = BlitOptions::new_position(
-                options.x + (tiles.width * sub_rect_view.width()) as i32,
-                options.y + (tiles.height * sub_rect_view.height()) as i32,
-            )
-            .with_sub_rect(sub_rect_view.as_sub_rect())
-            .with_area(remainder);
-
-            self.blit_slice(dst, dst_size, &options);
         }
     }
 
@@ -614,17 +618,12 @@ impl Blit for BlitBuffer {
                     .with_position(options.x + target.x, options.y + target.y)
                     .with_area(target.size);
 
-                // Set
-                if let Some(sub_rect) = options.sub_rect {
-                    slice_options.set_sub_rect((
-                        sub_rect.x + source.x,
-                        sub_rect.y + source.y,
-                        sub_rect.width(),
-                        sub_rect.height(),
-                    ))
+                // Move the already existing subrectangle if applicable
+                slice_options.set_sub_rect(if let Some(sub_rect) = options.sub_rect {
+                    sub_rect.shift(source.x, source.y)
                 } else {
-                    slice_options.set_sub_rect(source)
-                }
+                    source
+                });
 
                 self.blit_slice(dst, dst_size, &slice_options)
             });

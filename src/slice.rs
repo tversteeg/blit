@@ -19,8 +19,6 @@
 //! BlitOptions::new_slice9(x, y, 3, 6, 3, 6);
 //! ```
 
-use std::ops::Range;
-
 use crate::{Size, SubRect};
 
 /// Divide the source buffer into multiple sections and repeat the chosen section to fill the area.
@@ -106,8 +104,10 @@ impl Slice {
                 split_last,
             } => {
                 // Find the two middle intersections depending on which part needs to scale
-                let (middle_first, middle_second) =
-                    (*split_first, target_length.saturating_sub(*split_last));
+                let (middle_first, middle_second) = (
+                    *split_first,
+                    target_length.saturating_sub(source_length - *split_last),
+                );
 
                 // Ensure they don't go out of bounds
                 let middle_first = middle_first.min(middle_second);
@@ -125,14 +125,9 @@ impl Slice {
         .filter(|(target_start, target_end, source_start, source_end)| {
             target_start < target_end && source_start < source_end
         })
-        .map(
-            |(target_start, target_end, source_start, source_end)| SliceProjection {
-                source_start,
-                source_end,
-                target_start,
-                target_end,
-            },
-        )
+        .map(|(target_start, target_end, source_start, source_end)| {
+            SliceProjection::new(source_start, source_end, target_start, target_end)
+        })
     }
 }
 
@@ -152,7 +147,7 @@ pub enum BinarySection {
 }
 
 /// How a slice must be rendered.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SliceProjection {
     /// Left part of the absolute range in the source buffer to take the image from.
     pub source_start: u32,
@@ -165,6 +160,16 @@ pub(crate) struct SliceProjection {
 }
 
 impl SliceProjection {
+    /// Construct a new projection.
+    pub fn new(source_start: u32, source_end: u32, target_start: u32, target_end: u32) -> Self {
+        Self {
+            source_start,
+            source_end,
+            target_start,
+            target_end,
+        }
+    }
+
     /// The amount of pixels of the range.
     pub fn source_amount(&self) -> u32 {
         self.source_end - self.source_start
@@ -193,5 +198,37 @@ impl SliceProjection {
         );
 
         (source, target)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn slice9() {
+        let (horizontal_slice, vertical_slice) = (Slice::ternary(10, 20), Slice::ternary(25, 50));
+
+        let horizontal_projs = horizontal_slice
+            .divide_area_iter(30, 100)
+            .collect::<Vec<_>>();
+        let vertical_projs = vertical_slice.divide_area_iter(75, 150).collect::<Vec<_>>();
+        assert_eq!(
+            horizontal_projs,
+            [
+                SliceProjection::new(0, 10, 0, 10),
+                SliceProjection::new(10, 20, 10, 90),
+                SliceProjection::new(20, 30, 90, 100)
+            ]
+        );
+
+        assert_eq!(
+            vertical_projs,
+            [
+                SliceProjection::new(0, 25, 0, 25),
+                SliceProjection::new(25, 50, 25, 125),
+                SliceProjection::new(50, 75, 125, 150)
+            ]
+        );
     }
 }

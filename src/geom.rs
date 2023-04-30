@@ -210,20 +210,20 @@ impl SubRect {
     }
 
     /// Shift the left and top position while keeping the right and bottom position at the same spot.
-    pub fn shift<X, Y>(&mut self, new_x: X, new_y: Y)
+    pub fn shift<X, Y>(&self, new_x: X, new_y: Y) -> Self
     where
         X: ToPrimitive,
         Y: ToPrimitive,
     {
-        let new_x = new_x.to_u32().unwrap_or_default();
-        let new_y = new_y.to_u32().unwrap_or_default();
+        let new_x = new_x.to_i32().unwrap_or_default();
+        let new_y = new_y.to_i32().unwrap_or_default();
 
         let (right, bottom) = (self.right(), self.bottom());
-        self.x = new_x.min(right);
-        self.y = new_y.min(bottom);
+        let (x, y) = (new_x.min(right), new_y.min(bottom));
 
-        self.width = right - self.x;
-        self.height = bottom - self.y;
+        let size = Size::new((right - self.x).max(0), (bottom - self.y).max(0));
+
+        Self { x, y, size }
     }
 
     /// Width as `u32`.
