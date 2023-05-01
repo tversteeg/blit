@@ -2,16 +2,20 @@
 //!
 //! All colors can be constructed directly with an RGB `u32` where the alpha channel is ignored or from any crate that does this for you.
 //!
+//! For ergonomic use of this crate without needing to type convert everything most functions accepting numbers are generic with the number types being [`num_traits::ToPrimitive`], this might seem confusing but any number can be passed to these functions immediately.
+//!
+//! When using this crate the most important function to know about is [`Blit::blit`], which is implemented for [`BlitBuffer`].
+//!
 //! # Example
 //!
 //! ```
 //! # #[cfg(feature = "image")] mod test {
-//! use blit::{Blit, ToBlitBuffer, BlitOptions, Size};
+//! use blit::{Blit, ToBlitBuffer, BlitOptions, geom::Size};
 //!
 //! const CANVAS_SIZE: Size = Size { width: 180, height: 180 };
 //! const MASK_COLOR: u32 = 0xFF_00_FF;
 
-//! # fn main() -> Result<(), blit::Error> {
+//! # fn main()  {
 //! // Create a buffer in which we'll draw our image
 //! let mut canvas: Vec<u32> = vec![0xFF_FF_FF_FF; CANVAS_SIZE.pixels()];
 //!
@@ -19,16 +23,15 @@
 //! let img = image::open("examples/smiley_rgb.png").unwrap().into_rgb8();
 //!
 //! // Blit by creating a special blitting buffer first where the MASK_COLOR will be the color that will be made transparent
-//! let blit_buffer = img.to_blit_buffer_with_mask_color(MASK_COLOR)?;
+//! let blit_buffer = img.to_blit_buffer_with_mask_color(MASK_COLOR);
 //!
 //! // Draw the image 2 times to the buffer
 //! blit_buffer.blit(&mut canvas, CANVAS_SIZE, &BlitOptions::new_position(10, 10));
 //! blit_buffer.blit(&mut canvas, CANVAS_SIZE, &BlitOptions::new_position(20, 20));
-//! # Ok(()) }}
+//! # }}
 //! ```
 
-pub mod error;
-mod geom;
+pub mod geom;
 #[cfg(feature = "image")]
 mod image;
 pub mod slice;
@@ -42,15 +45,17 @@ mod view;
 pub mod prelude {
     #[cfg(feature = "image")]
     pub use crate::ToBlitBuffer;
-    pub use crate::{Blit, BlitBuffer};
+    pub use crate::{
+        geom::{Size, SubRect},
+        slice::Slice,
+        Blit, BlitBuffer,
+    };
 }
 
-pub use error::Error;
-pub use geom::{Size, SubRect};
+use geom::{Size, SubRect};
 
 use std::ops::Range;
 
-use error::Result;
 use num_traits::ToPrimitive;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -68,7 +73,7 @@ pub trait Blit {
     fn blit(&self, dst: &mut [u32], dst_size: Size, options: &BlitOptions);
 }
 
-/// Add blitting functions to external image types.
+/// Convert external image types to a specialized buffer optimized for blitting.
 ///
 /// Can be used to create a custom implementation if you want different image or other formats.
 pub trait ToBlitBuffer {
@@ -76,17 +81,17 @@ pub trait ToBlitBuffer {
     ///
     /// It's assumed that the alpha channel in the resulting pixel is properly set.
     /// The alpha treshold is the offset point at which an alpha value will be used as either a transparent pixel or a colored one.
-    fn to_blit_buffer_with_alpha(&self, alpha_treshold: u8) -> Result<BlitBuffer>;
+    fn to_blit_buffer_with_alpha(&self, alpha_treshold: u8) -> BlitBuffer;
 
     /// Convert the image to a custom `BlitBuffer` type which is optimized for applying the blitting operations.
     ///
     /// Ignore the alpha channel if set and use only a single color for transparency.
-    fn to_blit_buffer_with_mask_color<C>(&self, mask_color: C) -> Result<BlitBuffer>
-    where
-        C: Into<u32>;
+    fn to_blit_buffer_with_mask_color(&self, mask_color: u32) -> BlitBuffer;
 }
 
-/// Sprite blitting options.
+/// How, where and which part of the image to render.
+///
+/// Slices can be used to control which part gets scaled using tiling scaling.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct BlitOptions {
     /// Horizontal position on the destination buffer.
@@ -121,12 +126,12 @@ pub struct BlitOptions {
     /// Divide the source buffer into multiple vertical sections and repeat the chosen section to fill the area.
     ///
     /// This is only used when [`BlitOptions::area`] is set.
-    pub vertical_slices: Option<Slice>,
+    pub vertical_slice: Option<Slice>,
 
     /// Divide the source buffer into multiple horizontal sections and repeat the chosen section to fill the area.
     ///
     /// This is only used when [`BlitOptions::area`] is set.
-    pub horizontal_slices: Option<Slice>,
+    pub horizontal_slice: Option<Slice>,
 }
 
 impl BlitOptions {
@@ -225,19 +230,43 @@ impl BlitOptions {
 
     /// Draw as a scalable [9-slice graphic](https://en.wikipedia.org/wiki/9-slice_scaling).
     ///
+    /// The sub-rectangle of the center piece that will be scaled needs to be passed.
+    /// Note that the rectangle has a width and a height instead of the absolute coordinates the other slice functions accept.
+    ///
     /// # Sets field(s)
     ///
-    /// - [`BlitOptions::vertical_slices`]
-    /// - [`BlitOptions::horizontal_slices`].
+    /// - [`BlitOptions::vertical_slice`]
+    /// - [`BlitOptions::horizontal_slice`]
     #[must_use]
-    pub fn with_slice9(
-        mut self,
-        slice_left: u32,
-        slice_right: u32,
-        slice_top: u32,
-        slice_bottom: u32,
-    ) -> Self {
-        self.set_slice9(slice_left, slice_right, slice_top, slice_bottom);
+    pub fn with_slice9<R>(mut self, center: R) -> Self
+    where
+        R: Into<SubRect>,
+    {
+        self.set_slice9(center);
+
+        self
+    }
+
+    /// Scale a single horizontal piece of the buffer while keeping the other parts the same height.
+    ///
+    /// See [`crate::slice::Slice`] for more information.
+    ///
+    /// # Sets field(s)
+    ///
+    /// - [`BlitOptions::horizontal_slice`]
+    pub fn with_horizontal_slice(mut self, slice: Slice) -> Self {
+        self.horizontal_slice = Some(slice);
+
+        self
+    }
+
+    /// Scale a single vertical piece of the buffer while keeping the other parts the same height.
+    ///
+    /// # Sets field(s)
+    ///
+    /// - [`BlitOptions::vertical_slice`]
+    pub fn with_vertical_slice(mut self, slice: Slice) -> Self {
+        self.vertical_slice = Some(slice);
 
         self
     }
@@ -265,7 +294,7 @@ impl BlitOptions {
     /// # Sets field(s)
     ///
     /// - [`BlitOptions::x`]
-    /// - [`BlitOptions::y`].
+    /// - [`BlitOptions::y`]
     pub fn set_position<P>(&mut self, position: P)
     where
         P: Into<(i32, i32)>,
@@ -354,19 +383,41 @@ impl BlitOptions {
 
     /// Draw as a scalable [9-slice graphic](https://en.wikipedia.org/wiki/9-slice_scaling).
     ///
+    /// The sub-rectangle of the center piece that will be scaled needs to be passed.
+    /// Note that the rectangle has a width and a height instead of the absolute coordinates the other slice functions accept.
+    ///
     /// # Sets field(s)
     ///
-    /// - [`BlitOptions::vertical_slices`]
-    /// - [`BlitOptions::horizontal_slices`].
-    pub fn set_slice9(
-        &mut self,
-        slice_left: u32,
-        slice_right: u32,
-        slice_top: u32,
-        slice_bottom: u32,
-    ) {
-        self.vertical_slices = Some(Slice::ternary(slice_left, slice_right));
-        self.horizontal_slices = Some(Slice::ternary(slice_top, slice_bottom));
+    /// - [`BlitOptions::vertical_slice`]
+    /// - [`BlitOptions::horizontal_slice`]
+    pub fn set_slice9<R>(&mut self, center: R)
+    where
+        R: Into<SubRect>,
+    {
+        let center = center.into();
+
+        self.vertical_slice = Some(Slice::ternary(center.x, center.right()));
+        self.horizontal_slice = Some(Slice::ternary(center.y, center.bottom()));
+    }
+
+    /// Scale a single horizontal piece of the buffer while keeping the other parts the same height.
+    ///
+    /// See [`crate::slice::Slice`] for more information.
+    ///
+    /// # Sets field(s)
+    ///
+    /// - [`BlitOptions::horizontal_slice`]
+    pub fn set_horizontal_slice(&mut self, slice: Slice) {
+        self.horizontal_slice = Some(slice);
+    }
+
+    /// Scale a single vertical piece of the buffer while keeping the other parts the same height.
+    ///
+    /// # Sets field(s)
+    ///
+    /// - [`BlitOptions::vertical_slice`]
+    pub fn set_vertical_slice(&mut self, slice: Slice) {
+        self.vertical_slice = Some(slice);
     }
 }
 
@@ -387,7 +438,7 @@ impl BlitBuffer {
     /// It's assumed that the alpha channel in the resulting pixel is properly set.
     /// The alpha treshold is the offset point at which an alpha value will be used as either a transparent pixel or a colored one.
     #[must_use]
-    pub fn from_buffer<S>(src: &[Color], width: S, alpha_treshold: u8) -> Result<Self>
+    pub fn from_buffer<S>(src: &[Color], width: S, alpha_treshold: u8) -> Self
     where
         S: ToPrimitive,
     {
@@ -399,7 +450,7 @@ impl BlitBuffer {
     /// It's assumed that the alpha channel in the resulting pixel is properly set.
     /// The alpha treshold is the offset point at which an alpha value will be used as either a transparent pixel or a colored one.
     #[must_use]
-    pub fn from_iter<I, S>(iter: I, width: S, alpha_treshold: u8) -> Result<Self>
+    pub fn from_iter<I, S>(iter: I, width: S, alpha_treshold: u8) -> Self
     where
         I: Iterator<Item = Color>,
         S: ToPrimitive,
@@ -421,7 +472,7 @@ impl BlitBuffer {
         // We can calculate the height from the total buffer
         let size = Size::from_len(data.len(), width.to_usize().unwrap_or_default());
 
-        Ok(Self { size, data })
+        Self { size, data }
     }
 
     /// Width of the buffer in pixels.
@@ -457,11 +508,19 @@ impl BlitBuffer {
         options: &BlitOptions,
         target_area: Size,
     ) -> Vec<(SubRect, SubRect)> {
-        match (options.vertical_slices, options.horizontal_slices) {
+        match (options.vertical_slice, options.horizontal_slice) {
             // No slices, so no need to split it
             (None, None) => Vec::new(),
-            (None, Some(horizontal)) => todo!(),
-            (Some(vertical), None) => todo!(),
+            // Only a horizontal slice
+            (None, Some(horizontal)) => horizontal
+                .divide_area_iter(self.width(), target_area.width)
+                .map(|horizontal| horizontal.into_sub_rects_static_y(self.height()))
+                .collect(),
+            // Only a vertical slice
+            (Some(vertical), None) => vertical
+                .divide_area_iter(self.height(), target_area.height)
+                .map(|vertical| vertical.into_sub_rects_static_x(self.width()))
+                .collect(),
             // The buffer is split both horizontally and vertically
             (Some(vertical), Some(horizontal)) => {
                 let horizontal_ranges = horizontal
@@ -483,6 +542,14 @@ impl BlitBuffer {
 
     /// Blit a sliced section.
     fn blit_slice(&self, dst: &mut [u32], dst_size: Size, options: &BlitOptions) {
+        // If the size of the image is the same as our buffer and the location is zero we can completely blit all bytes
+        if options.x == 0 && options.y == 0 && dst_size == self.size {
+            let pixels = dst_size.pixels();
+            self.blit_horizontal(dst, 0..pixels, 0..pixels);
+
+            return;
+        }
+
         // Convert the destination to view so we can calculate with it
         let dst_view = ImageView::full(dst_size);
 
@@ -660,8 +727,7 @@ mod tests {
             ],
             2,
             127,
-        )
-        .unwrap();
+        );
         blit.blit(
             &mut buffer,
             Size::new(2, 3),

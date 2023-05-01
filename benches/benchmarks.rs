@@ -10,7 +10,7 @@ fn criterion_benchmark(c: &mut Criterion<Perf>) {
         .unwrap()
         .into_rgb8();
 
-    let blit = rgb.to_blit_buffer_with_mask_color(0xFF_00_FF).unwrap();
+    let blit = rgb.to_blit_buffer_with_mask_color(0xFF_00_FF);
     let size = blit.size();
 
     let mut group = c.benchmark_group("blit position");
@@ -56,17 +56,13 @@ fn criterion_benchmark(c: &mut Criterion<Perf>) {
         let mut buffer: Vec<u32> = vec![0; size.pixels()];
 
         b.iter(|| {
-            blit.blit(
-                &mut buffer,
-                black_box(Size::new(SIZE, SIZE)),
-                black_box(&BlitOptions::new_position(0, 0)),
-            );
+            blit.blit(&mut buffer, black_box(size), black_box(&BlitOptions::new()));
         });
     });
 
     c.bench_function("load img with mask", |b| {
         b.iter(|| {
-            rgb.to_blit_buffer_with_mask_color(0xFF_00_FF).unwrap();
+            rgb.to_blit_buffer_with_mask_color(0xFF_00_FF);
         });
     });
 }

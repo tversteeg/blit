@@ -5,19 +5,18 @@
 //! ```rust
 //! use blit::{BlitOptions, slice::Slice};
 //!
-//! # let (x, y) = (0, 0);
 //! // Create a slice 9 type split of a 9x9 image in 3 exact parts
 //! BlitOptions {
-//!    x,
-//!    y,
-//!    vertical_slices: Some(Slice::ternary_middle(3, 6)),
-//!    horizontal_slices: Some(Slice::ternary_middle(3, 6)),
+//!    vertical_slice: Some(Slice::ternary(3, 6)),
+//!    horizontal_slice: Some(Slice::ternary(3, 6)),
 //!    ..Default::default()
 //! };
 //!
-//! // Although you probably want
-//! BlitOptions::new_slice9(x, y, 3, 6, 3, 6);
+//! // Although you probably want, note that the right and bottom coordinates are not absolute anymore, here they are the width and height of the center rectangle
+//! BlitOptions::new().with_slice9((3, 3, 3, 3));
 //! ```
+
+use num_traits::ToPrimitive;
 
 use crate::{Size, SubRect};
 
@@ -44,32 +43,49 @@ pub enum Slice {
 }
 
 impl Slice {
-    /// Create a binary split where the first section is chosen.
+    /// Create a binary split where the first section is scaled.
     ///
     /// When horizontal this is the top section.
     /// When vertical this is the left section.
-    pub const fn binary_first(split: u32) -> Self {
+    pub fn binary_first<S>(split: S) -> Self
+    where
+        S: ToPrimitive,
+    {
+        let split = split.to_u32().unwrap_or_default();
+
         Self::Binary {
             split,
             repeat: BinarySection::First,
         }
     }
 
-    /// Create a binary split where the last section is chosen.
+    /// Create a binary split where the last section is scaled.
     ///
     /// When horizontal this is the bottom section.
     /// When vertical this is the right section.
-    pub const fn binary_last(split: u32) -> Self {
+    pub fn binary_last<S>(split: S) -> Self
+    where
+        S: ToPrimitive,
+    {
+        let split = split.to_u32().unwrap_or_default();
+
         Self::Binary {
             split,
             repeat: BinarySection::Last,
         }
     }
 
-    /// Create a ternary split where the last section is chosen.
+    /// Create a ternary split where the middle section is scaled.
     ///
     /// With both horizontal and vertical this is the middle section.
-    pub const fn ternary(split_first: u32, split_last: u32) -> Self {
+    pub fn ternary<S1, S2>(split_first: S1, split_last: S2) -> Self
+    where
+        S1: ToPrimitive,
+        S2: ToPrimitive,
+    {
+        let split_first = split_first.to_u32().unwrap_or_default();
+        let split_last = split_last.to_u32().unwrap_or_default();
+
         Self::Ternary {
             split_first,
             split_last,
@@ -88,13 +104,12 @@ impl Slice {
                 let middle = match repeat {
                     BinarySection::First => target_length.saturating_sub(*split),
                     BinarySection::Last => *split,
-                }
-                .min(target_length);
+                };
 
-                // The (0, 0) pair will be removed by the filter, we have to add this otherwise the compiler will complain about the iterators not being the same size
                 [
                     (0, middle, 0, *split),
                     (middle, target_length, *split, source_length),
+                    // The (0, 0) pair will be removed by the filter, we have to add this otherwise the compiler will complain about the iterators not being the same size
                     (0, 0, 0, 0),
                 ]
                 .into_iter()
@@ -106,7 +121,7 @@ impl Slice {
                 // Find the two middle intersections depending on which part needs to scale
                 let (middle_first, middle_second) = (
                     *split_first,
-                    target_length.saturating_sub(source_length - *split_last),
+                    target_length.saturating_sub(source_length.saturating_sub(*split_last)),
                 );
 
                 // Ensure they don't go out of bounds
@@ -170,14 +185,30 @@ impl SliceProjection {
         }
     }
 
-    /// The amount of pixels of the range.
+    /// Amount of pixels of the range.
     pub fn source_amount(&self) -> u32 {
         self.source_end - self.source_start
     }
 
-    /// The amount of pixels of the range.
+    /// Amount of pixels of the range.
     pub fn target_amount(&self) -> u32 {
         self.target_end - self.target_start
+    }
+
+    /// Create a `(source, target)` rectangle tuple with a static Y axis.
+    pub fn into_sub_rects_static_y(self, y_size: u32) -> (SubRect, SubRect) {
+        let source = SubRect::from((self.source_start, 0, self.source_amount(), y_size));
+        let target = SubRect::from((self.target_start, 0, self.target_amount(), y_size));
+
+        (source, target)
+    }
+
+    /// Create a `(source, target)` rectangle tuple with a static X axis.
+    pub fn into_sub_rects_static_x(self, x_size: u32) -> (SubRect, SubRect) {
+        let source = SubRect::from((0, self.source_start, x_size, self.source_amount()));
+        let target = SubRect::from((0, self.target_start, x_size, self.target_amount()));
+
+        (source, target)
     }
 
     /// Create a `(source, target)` rectangle tuple from horizontal and vertical projections.
@@ -229,6 +260,46 @@ mod tests {
                 SliceProjection::new(25, 50, 25, 125),
                 SliceProjection::new(50, 75, 125, 150)
             ]
+        );
+
+        // Test mapping to subrectangles
+        assert_eq!(
+            SliceProjection::combine_into_sub_rects(&horizontal_projs[0], &vertical_projs[0]),
+            ((0, 0, 10, 25).into(), (0, 0, 10, 25).into())
+        );
+        assert_eq!(
+            SliceProjection::combine_into_sub_rects(&horizontal_projs[1], &vertical_projs[1]),
+            ((10, 25, 10, 25).into(), (10, 25, 80, 100).into())
+        );
+        assert_eq!(
+            SliceProjection::combine_into_sub_rects(&horizontal_projs[2], &vertical_projs[2]),
+            ((20, 50, 10, 25).into(), (90, 125, 10, 25).into())
+        );
+
+        assert_eq!(
+            horizontal_projs[0].clone().into_sub_rects_static_y(25),
+            ((0, 0, 10, 25).into(), (0, 0, 10, 25).into())
+        );
+        assert_eq!(
+            horizontal_projs[1].clone().into_sub_rects_static_y(25),
+            ((10, 0, 10, 25).into(), (10, 0, 80, 25).into())
+        );
+        assert_eq!(
+            horizontal_projs[2].clone().into_sub_rects_static_y(25),
+            ((20, 0, 10, 25).into(), (90, 0, 10, 25).into())
+        );
+
+        assert_eq!(
+            vertical_projs[0].clone().into_sub_rects_static_x(10),
+            ((0, 0, 10, 25).into(), (0, 0, 10, 25).into())
+        );
+        assert_eq!(
+            vertical_projs[1].clone().into_sub_rects_static_x(10),
+            ((0, 25, 10, 25).into(), (0, 25, 10, 100).into())
+        );
+        assert_eq!(
+            vertical_projs[2].clone().into_sub_rects_static_x(10),
+            ((0, 50, 10, 25).into(), (0, 125, 10, 25).into())
         );
     }
 }

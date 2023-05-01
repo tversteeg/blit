@@ -3,21 +3,18 @@ use std::ops::Deref;
 use image::{ImageBuffer, Pixel};
 use num_traits::ToPrimitive;
 
-use crate::{error::Result, BlitBuffer, Color, ToBlitBuffer};
+use crate::{BlitBuffer, Color, ToBlitBuffer};
 
 impl<P, Container> ToBlitBuffer for ImageBuffer<P, Container>
 where
     P: Pixel,
     Container: Deref<Target = [P::Subpixel]>,
 {
-    fn to_blit_buffer_with_mask_color<C>(&self, mask_color: C) -> Result<BlitBuffer>
-    where
-        C: Into<u32>,
-    {
+    fn to_blit_buffer_with_mask_color(&self, mask_color: u32) -> BlitBuffer {
         let (width, _height) = self.dimensions();
 
         // Remove the alpha channel
-        let mask_color = mask_color.into() | 0xFF_00_00_00;
+        let mask_color = mask_color | 0xFF_00_00_00;
 
         BlitBuffer::from_iter(
             self.pixels().map(|pixel| pixel.to_rgba()).map(|pixel| {
@@ -40,7 +37,7 @@ where
         )
     }
 
-    fn to_blit_buffer_with_alpha(&self, alpha_treshold: u8) -> Result<BlitBuffer> {
+    fn to_blit_buffer_with_alpha(&self, alpha_treshold: u8) -> BlitBuffer {
         let (width, _height) = self.dimensions();
 
         BlitBuffer::from_iter(

@@ -171,7 +171,9 @@ impl<T: ToPrimitive> Rem<T> for Size {
     }
 }
 
-/// Helper struct for defining sub rectangles.
+/// Helper struct for defining sub-rectangles.
+///
+/// A sub-rectangle is a rectangle that's part of a bigger rectangle.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SubRect {

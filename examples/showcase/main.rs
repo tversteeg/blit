@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use blit::{Blit, BlitBuffer, BlitOptions, Size, SubRect, ToBlitBuffer};
+use blit::{geom::Size, geom::SubRect, slice::Slice, Blit, BlitBuffer, BlitOptions, ToBlitBuffer};
 
 use num_traits::ToPrimitive;
 use pixels::{wgpu::TextureFormat, PixelsBuilder, SurfaceTexture};
@@ -34,7 +34,7 @@ fn frame0(
     font: &BlitBuffer,
     _mouse: (i32, i32),
 ) {
-    draw_text(dst, font, 0, "Go to the next showcase item by clicking\nthe left mouse button.\n\nGo to the previous showcase item by\nclicking the right mouse button.");
+    draw_text(dst, font, 0, "This is an interactive showcase of the\n'blit' crate, you can interact with the\nrendering by moving the cursor\n\nGo to the next showcase item by clicking\nthe left mouse button\n\nGo to the previous showcase item by\nclicking the right mouse button");
 }
 
 /// Draw the sprite completely.
@@ -172,7 +172,7 @@ fn frame5(
     font: &BlitBuffer,
     mouse: (i32, i32),
 ) {
-    let (offset_x, offset_y) = (20, 20);
+    let (offset_x, offset_y) = (40, 40);
 
     buf.blit(
         dst,
@@ -205,7 +205,7 @@ fn frame6(
     font: &BlitBuffer,
     mouse: (i32, i32),
 ) {
-    let (offset_x, offset_y) = (20, 20);
+    let (offset_x, offset_y) = (40, 40);
 
     buf.blit(
         dst,
@@ -240,13 +240,13 @@ fn frame7(
     font: &BlitBuffer,
     mouse: (i32, i32),
 ) {
-    let (offset_x, offset_y) = (20, 40);
+    let (offset_x, offset_y) = (60, 60);
 
     scalable_buf.blit(
         dst,
         DST_SIZE,
         &BlitOptions::new_position(offset_x, offset_y)
-            .with_slice9(10, 20, 10, 20)
+            .with_slice9((10, 10, 10, 10))
             .with_area(Size::new(
                 (mouse.0 - offset_x).max(1),
                 (mouse.1 - offset_y).max(1),
@@ -263,7 +263,39 @@ fn frame7(
         dst,
         font,
         DST_SIZE.height - CHAR_SIZE.height * 3,
-        "BlitOptions::new_position(position)\n\t.with_slice9(11, 17, 9, 13)\n\t.with_area(mouse)",
+        "BlitOptions::new_position(position)\n\t.with_slice9((10, 10, 10, 10))\n\t.with_area(mouse)",
+    );
+}
+
+/// Draw the full sprite split in half scaling the left side.
+fn frame8(
+    dst: &mut [u32],
+    buf: &BlitBuffer,
+    _scalable_buf: &BlitBuffer,
+    font: &BlitBuffer,
+    mouse: (i32, i32),
+) {
+    let (offset_x, offset_y) = (60, 60);
+
+    buf.blit(
+        dst,
+        DST_SIZE,
+        &BlitOptions::new_position(offset_x, offset_y)
+            .with_horizontal_slice(Slice::binary_first(buf.width() / 2))
+            .with_area(Size::new((mouse.0 - offset_x).max(1), buf.height())),
+    );
+
+    draw_text(
+        dst,
+        font,
+        0,
+        "More fine-grained control for slices is\nalso possible",
+    );
+    draw_text(
+        dst,
+        font,
+        DST_SIZE.height - CHAR_SIZE.height * 5,
+        "BlitOptions::new_position(position)\n\t.with_horizontal_slice(\n\t\tSlice::binary_first(w/2)\n\t)\n\t.with_area((mouse_x, h))",
     );
 }
 
@@ -310,22 +342,19 @@ async fn run() {
     let buf = image::load_from_memory(include_bytes!("./smiley_rgb.png"))
         .unwrap()
         .into_rgb8()
-        .to_blit_buffer_with_mask_color(MASK_COLOR)
-        .unwrap();
+        .to_blit_buffer_with_mask_color(MASK_COLOR);
 
     // Load the font image with mask color from disk
     let font = image::load_from_memory(include_bytes!("./ArtosSans.png"))
         .unwrap()
         .into_rgb8()
-        .to_blit_buffer_with_mask_color(MASK_COLOR)
-        .unwrap();
+        .to_blit_buffer_with_mask_color(MASK_COLOR);
 
     // Load a scalable image with a mask color from disk
     let scalable_buf = image::load_from_memory(include_bytes!("./9slice.png"))
         .unwrap()
         .into_rgba8()
-        .to_blit_buffer_with_alpha(127)
-        .unwrap();
+        .to_blit_buffer_with_alpha(127);
 
     // Setup a winit window
     let event_loop = EventLoop::new();
@@ -366,7 +395,7 @@ async fn run() {
 
     // All frame drawing functions, cycled by clicking
     let frames: Vec<fn(&mut [u32], &BlitBuffer, &BlitBuffer, &BlitBuffer, (i32, i32))> = vec![
-        frame0, frame1, frame2, frame3, frame4, frame5, frame6, frame7,
+        frame0, frame1, frame2, frame3, frame4, frame5, frame6, frame7, frame8,
     ];
 
     // Keep track of how long each frame takes to render
