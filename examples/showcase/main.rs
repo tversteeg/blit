@@ -1,9 +1,7 @@
-use std::rc::Rc;
-
 use blit::{geom::Size, geom::SubRect, slice::Slice, Blit, BlitBuffer, BlitOptions, ToBlitBuffer};
 
 use num_traits::ToPrimitive;
-use pixels::{wgpu::TextureFormat, PixelsBuilder, SurfaceTexture};
+use pixels::{PixelsBuilder, SurfaceTexture};
 use winit::{
     dpi::LogicalSize,
     event::{ElementState, Event, MouseButton, WindowEvent},
@@ -358,22 +356,27 @@ async fn run() {
 
     // Setup a winit window
     let event_loop = EventLoop::new();
-    let size = LogicalSize::new(DST_SIZE.width as f64, DST_SIZE.height as f64);
-    let window = Rc::new(
-        WindowBuilder::new()
-            .with_title("Blit Showcase")
-            .with_inner_size(size)
-            .with_min_inner_size(size)
-            .build(&event_loop)
-            .unwrap(),
+    let size = LogicalSize::new(
+        DST_SIZE.width as f64 * 2.0 + 10.0,
+        DST_SIZE.height as f64 * 2.0 + 10.0,
     );
+    let mut window_builder = WindowBuilder::new()
+        .with_title("Blit Showcase")
+        .with_inner_size(size);
 
     // Setup the WASM canvas if running on the browser
     #[cfg(target_arch = "wasm32")]
-    wasm::setup_canvas(window.clone());
+    {
+        use winit::platform::web::WindowBuilderExtWebSys;
+
+        window_builder = window_builder.with_canvas(Some(wasm::setup_canvas()));
+    }
+
+    let window = window_builder.build(&event_loop).unwrap();
 
     let mut pixels = {
-        let surface_texture = SurfaceTexture::new(DST_SIZE.width, DST_SIZE.height, window.as_ref());
+        let surface_texture =
+            SurfaceTexture::new(DST_SIZE.width * 2 + 10, DST_SIZE.height * 2 + 10, &window);
         PixelsBuilder::new(DST_SIZE.width, DST_SIZE.height, surface_texture)
             .clear_color(pixels::wgpu::Color {
                 r: 0.3,
@@ -381,7 +384,6 @@ async fn run() {
                 b: 0.3,
                 a: 1.0,
             })
-            .texture_format(TextureFormat::Bgra8UnormSrgb)
             .build_async()
             .await
     }
@@ -415,6 +417,16 @@ async fn run() {
                     &font,
                     mouse,
                 );
+
+                // Blit draws the pixels in RGBA format, but the pixels crate expects BGRA, so convert it
+                pixels.frame_mut().chunks_exact_mut(4).for_each(|color| {
+                    let (r, g, b, a) = (color[0], color[1], color[2], color[3]);
+
+                    color[0] = b;
+                    color[1] = g;
+                    color[2] = r;
+                    color[3] = a;
+                });
 
                 if let Err(err) = pixels.render() {
                     log::error!("Pixels error:\n{err}");
@@ -505,47 +517,33 @@ fn main() {
 
 #[cfg(target_arch = "wasm32")]
 mod wasm {
-    use std::rc::Rc;
-    use wasm_bindgen::{closure::Closure, JsCast};
-    use web_sys::{Element, Event};
-    use winit::{dpi::LogicalSize, platform::web::WindowExtWebSys, window::Window};
+    use wasm_bindgen::JsCast;
+    use web_sys::HtmlCanvasElement;
 
     /// Attach the winit window to a canvas.
-    pub fn setup_canvas(window: Rc<Window>) {
+    pub fn setup_canvas() -> HtmlCanvasElement {
         log::debug!("Binding window to HTML canvas");
 
-        // Retrieve current width and height dimensions of browser client window
-        let get_window_size = || {
-            let client_window = web_sys::window().unwrap();
-            LogicalSize::new(
-                client_window.inner_width().unwrap().as_f64().unwrap(),
-                client_window.inner_height().unwrap().as_f64().unwrap(),
-            )
-        };
+        let window = web_sys::window().unwrap();
 
-        let window = Rc::clone(&window);
+        let document = window.document().unwrap();
+        let body = document.body().unwrap();
+        body.style().set_css_text("text-align: center");
 
-        // Initialize winit window with current dimensions of browser client
-        window.set_inner_size(get_window_size());
-
-        let client_window = web_sys::window().unwrap();
-
-        // Attach winit canvas to body element
-        web_sys::window()
-            .and_then(|win| win.document())
-            .and_then(|doc| doc.body())
-            .and_then(|body| body.append_child(&Element::from(window.canvas())).ok())
-            .expect("couldn't append canvas to document body");
-
-        // Listen for resize event on browser client. Adjust winit window dimensions
-        // on event trigger
-        let closure = Closure::wrap(Box::new(move |_e: Event| {
-            let size = get_window_size();
-            window.set_inner_size(size)
-        }) as Box<dyn FnMut(_)>);
-        client_window
-            .add_event_listener_with_callback("resize", closure.as_ref().unchecked_ref())
+        let canvas = document
+            .create_element("canvas")
+            .unwrap()
+            .dyn_into::<HtmlCanvasElement>()
             .unwrap();
-        closure.forget();
+
+        canvas.set_id("canvas");
+        body.append_child(&canvas).unwrap();
+        canvas.style().set_css_text("display:block; margin: auto");
+
+        let header = document.create_element("h2").unwrap();
+        header.set_text_content(Some("Blit Showcase"));
+        body.append_child(&header).unwrap();
+
+        canvas
     }
 }

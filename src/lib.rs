@@ -1,6 +1,8 @@
 //! Draw sprites quickly using a masking color or an alpha treshold.
 //!
-//! All colors can be constructed directly with an RGB `u32` where the alpha channel is ignored or from any crate that does this for you.
+//! This crate works with RGBA `u32` buffers.
+//! The alpha channel can only be read with a singular treshold, converting it to a binary transparent or opaque color.
+//! The reason this limitation is in place is that it allows efficient rendering optimizations.
 //!
 //! For ergonomic use of this crate without needing to type convert everything most functions accepting numbers are generic with the number types being [`num_traits::ToPrimitive`], this might seem confusing but any number can be passed to these functions immediately.
 //!
@@ -70,6 +72,8 @@ pub trait Blit {
     /// Draw the source input on the destination image.
     ///
     /// See [`BlitOptions`] for multiple ways of drawing the image.
+    ///
+    /// The pixels will be drawn to the destination buffer in RGBA format.
     fn blit(&self, dst: &mut [u32], dst_size: Size, options: &BlitOptions);
 }
 
@@ -433,7 +437,7 @@ pub struct BlitBuffer {
 }
 
 impl BlitBuffer {
-    /// Create a instance from a buffer of ARGB data packed in a single `u32`.
+    /// Create a instance from a buffer of RGBA data packed in a single `u32`.
     ///
     /// It's assumed that the alpha channel in the resulting pixel is properly set.
     /// The alpha treshold is the offset point at which an alpha value will be used as either a transparent pixel or a colored one.
@@ -445,7 +449,7 @@ impl BlitBuffer {
         Self::from_iter(src.iter().copied(), width, alpha_treshold)
     }
 
-    /// Create a instance from a iterator of ARGB data packed in a single `u32`.
+    /// Create a instance from a iterator of RGBA data packed in a single `u32`.
     ///
     /// It's assumed that the alpha channel in the resulting pixel is properly set.
     /// The alpha treshold is the offset point at which an alpha value will be used as either a transparent pixel or a colored one.

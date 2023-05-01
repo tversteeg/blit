@@ -1,4 +1,4 @@
-use blit::{Blit, BlitOptions, Size, ToBlitBuffer};
+use blit::{geom::Size, Blit, BlitOptions, ToBlitBuffer};
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use criterion_perf_events::Perf;
 use perfcnt::linux::{HardwareEventType, PerfCounterBuilderLinux};
@@ -27,7 +27,13 @@ fn criterion_benchmark(c: &mut Criterion<Perf>) {
         group.bench_with_input(BenchmarkId::from_parameter(x), &options, |b, options| {
             let mut buffer: Vec<u32> = vec![0; SIZE * SIZE];
 
-            b.iter(|| blit.blit(&mut buffer, black_box(Size::new(SIZE, SIZE)), options));
+            b.iter(|| {
+                blit.blit(
+                    &mut buffer,
+                    black_box(Size::new(SIZE, SIZE)),
+                    black_box(options),
+                )
+            });
         });
     }
     group.finish();
@@ -47,7 +53,13 @@ fn criterion_benchmark(c: &mut Criterion<Perf>) {
         group.bench_with_input(BenchmarkId::from_parameter(x), &options, |b, options| {
             let mut buffer: Vec<u32> = vec![0; SIZE * SIZE];
 
-            b.iter(|| blit.blit(&mut buffer, black_box(Size::new(SIZE, SIZE)), options));
+            b.iter(|| {
+                blit.blit(
+                    &mut buffer,
+                    black_box(Size::new(SIZE, SIZE)),
+                    black_box(options),
+                )
+            });
         });
     }
     group.finish();

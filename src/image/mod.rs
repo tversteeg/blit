@@ -17,7 +17,9 @@ where
         let mask_color = mask_color | 0xFF_00_00_00;
 
         BlitBuffer::from_iter(
-            self.pixels().map(|pixel| pixel.to_rgba()).map(|pixel| {
+            self.pixels().map(|pixel| {
+                let pixel = pixel.channels();
+
                 let pixel = color_from_u64(
                     0xFF,
                     ToPrimitive::to_u64(&pixel[0]).unwrap_or(0x0),
@@ -41,7 +43,9 @@ where
         let (width, _height) = self.dimensions();
 
         BlitBuffer::from_iter(
-            self.pixels().map(|pixel| pixel.to_rgba()).map(|pixel| {
+            self.pixels().map(|pixel| {
+                let pixel = pixel.channels();
+
                 color_from_u64(
                     // RGBA -> ARGB
                     ToPrimitive::to_u64(&pixel[3]).unwrap_or(0x0),

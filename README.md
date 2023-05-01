@@ -1,8 +1,11 @@
 # blit
 A Rust library for blitting 2D sprites
 
-<a href="https://github.com/tversteeg/const-tweaker/actions"><img src="https://github.com/tversteeg/const-tweaker/workflows/CI/badge.svg" alt="CI"/></a>
-[![Cargo](https://img.shields.io/crates/v/blit.svg)](https://crates.io/crates/blit) [![License: GPL-3.0](https://img.shields.io/crates/l/blit.svg)](#license) [![Downloads](https://img.shields.io/crates/d/blit.svg)](#downloads)
+[![Build Status](https://github.com/tversteeg/blit/workflows/CI/badge.svg)](https://github.com/tversteeg/blit/actions?workflow=CI)
+[![Crates.io](https://img.shields.io/crates/v/blit.svg)](https://crates.io/crates/blit)
+[![Documentation](https://docs.rs/blit/badge.svg)](https://docs.rs/blit)
+[![License: GPL-3.0](https://img.shields.io/crates/l/blit.svg)](#license)
+[![Downloads](https://img.shields.io/crates/d/blit.svg)](#downloads)
 
 ### [Documentation](https://docs.rs/blit/)
 
@@ -12,7 +15,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-blit = "0.7"
+blit = "0.8"
 ```
 
 ## [Interactive Demo](https://tversteeg.nl/blit/showcase)
