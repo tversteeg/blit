@@ -244,7 +244,7 @@ fn frame7(
         dst,
         DST_SIZE,
         &BlitOptions::new_position(offset_x, offset_y)
-            .with_slice9((10, 10, 10, 10))
+            .with_slice9((11, 9, 6, 4))
             .with_area(Size::new(
                 (mouse.0 - offset_x).max(1),
                 (mouse.1 - offset_y).max(1),
@@ -279,7 +279,7 @@ fn frame8(
         dst,
         DST_SIZE,
         &BlitOptions::new_position(offset_x, offset_y)
-            .with_horizontal_slice(Slice::binary_first(buf.width() / 2))
+            .with_vertical_slice(Slice::binary_first(buf.width() / 2))
             .with_area(Size::new((mouse.0 - offset_x).max(1), buf.height())),
     );
 

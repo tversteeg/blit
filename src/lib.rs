@@ -127,6 +127,12 @@ pub struct BlitOptions {
     /// This is similar to UV coordinates but instead of relative positions in the range of `0..1` this takes absolute positions in the range `0..width` for horizontal positions and `0..height` for vertical positions.
     pub sub_rect: Option<SubRect>,
 
+    /// Which part of the target buffer to render.
+    ///
+    /// - When `None` is used, `(0, 0, target_width, target_height)` is set instead.
+    /// - With `Some(..)`, the values in the tuple are `(x, y, width, height)`.
+    pub mask_rect: Option<SubRect>,
+
     /// Divide the source buffer into multiple vertical sections and repeat the chosen section to fill the area.
     ///
     /// This is only used when [`BlitOptions::area`] is set.
@@ -517,20 +523,21 @@ impl BlitBuffer {
             (None, None) => Vec::new(),
             // Only a horizontal slice
             (None, Some(horizontal)) => horizontal
-                .divide_area_iter(self.width(), target_area.width)
-                .map(|horizontal| horizontal.into_sub_rects_static_y(self.height()))
+                .divide_area_iter(self.height(), target_area.height)
+                .map(|horizontal| horizontal.into_sub_rects_static_x(self.width()))
                 .collect(),
             // Only a vertical slice
             (Some(vertical), None) => vertical
-                .divide_area_iter(self.height(), target_area.height)
-                .map(|vertical| vertical.into_sub_rects_static_x(self.width()))
+                .divide_area_iter(self.width(), target_area.width)
+                .map(|vertical| vertical.into_sub_rects_static_y(self.height()))
                 .collect(),
             // The buffer is split both horizontally and vertically
             (Some(vertical), Some(horizontal)) => {
-                let horizontal_ranges = horizontal
+                let horizontal_ranges = vertical
                     .divide_area_iter(self.width(), target_area.width)
                     .collect::<Vec<_>>();
-                let vertical_ranges = vertical.divide_area_iter(self.height(), target_area.height);
+                let vertical_ranges =
+                    horizontal.divide_area_iter(self.height(), target_area.height);
 
                 // Return a cartesian product of all ranges
                 vertical_ranges
