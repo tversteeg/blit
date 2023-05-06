@@ -54,7 +54,7 @@ pub mod prelude {
     };
 }
 
-use geom::{Size, SubRect};
+use geom::{Coordinate, Size, SubRect};
 
 use std::ops::Range;
 
@@ -69,12 +69,36 @@ type Color = u32;
 
 /// Blit functions that can be called from multiple places.
 pub trait Blit {
-    /// Draw the source input on the destination image.
+    /// Size of the source buffer.
+    fn size(&self) -> Size;
+
+    /// Start a blitting pipeline.
+    fn blit<'a, 'b, S>(
+        &'a self,
+        target: &'b mut [u32],
+        target_size: S,
+    ) -> BlitPipeline<'a, 'b, Self>
+    where
+        S: Into<Size>,
+        Self: Sized,
+    {
+        BlitPipeline::new(self, target, target_size.into())
+    }
+
+    /// Library function for crates implementing this trait.
     ///
-    /// See [`BlitOptions`] for multiple ways of drawing the image.
-    ///
-    /// The pixels will be drawn to the destination buffer in RGBA format.
-    fn blit(&self, dst: &mut [u32], dst_size: Size, options: &BlitOptions);
+    /// This function shouldn't be called directly.
+    fn blit_impl(
+        &self,
+        target: &mut [Color],
+        target_width: usize,
+        x: usize,
+        y: usize,
+        u: usize,
+        v: usize,
+        width: usize,
+        height: usize,
+    );
 }
 
 /// Convert external image types to a specialized buffer optimized for blitting.
@@ -93,341 +117,121 @@ pub trait ToBlitBuffer {
     fn to_blit_buffer_with_mask_color(&self, mask_color: u32) -> BlitBuffer;
 }
 
-/// How, where and which part of the image to render.
+/// Pipeline for rendering an image on another image.
 ///
-/// Slices can be used to control which part gets scaled using tiling scaling.
-#[derive(Debug, Default, Clone, PartialEq)]
-pub struct BlitOptions {
-    /// Horizontal position on the destination buffer.
-    pub x: i32,
+/// This pipeline can be started by calling [`Blit::blit`] on [`BlitBuffer`] which can be created by implementations of the [`ToBlitBuffer`] trait.
+#[derive(Debug)]
+pub struct BlitPipeline<'a, 'b, B: Blit> {
+    /// What to blit.
+    source: &'a B,
 
-    /// Vertical position on the destination buffer.
-    pub y: i32,
+    /// Where to blit it to.
+    target: &'b mut [Color],
 
-    /// Size of the area `(width, height)` on the destination buffer.
-    ///
-    /// - When `None` is used, the size of the source buffer or of the subrectangle if set will be used.
-    /// - When the area is smaller than the source buffer it effectively functions as the width and height parameters of [`BlitOptions::sub_rect`].
-    /// - When the area is bigger than the source buffer the default behaviour will be tiling.
-    ///
-    /// ```rust
-    /// # use blit::BlitOptions;
-    /// assert_eq!(
-    ///     BlitOptions::default().with_area((10, 10)).sub_rect((100, 100)),
-    ///     BlitOptions::default().with_sub_rect((0, 0, 10, 10)).sub_rect((100, 100))
-    /// );
-    /// ```
-    pub area: Option<Size>,
+    /// Target position.
+    pos: Coordinate,
 
-    /// Which part of the source buffer to render.
-    ///
-    /// - When `None` is used, `(0, 0, source_width, source_height)` is set instead.
-    /// - With `Some(..)`, the values in the tuple are `(x, y, width, height)`.
-    ///
-    /// This is similar to UV coordinates but instead of relative positions in the range of `0..1` this takes absolute positions in the range `0..width` for horizontal positions and `0..height` for vertical positions.
-    pub sub_rect: Option<SubRect>,
+    /// Size of the target.
+    target_size: Size,
 
-    /// Which part of the target buffer to render.
-    ///
-    /// - When `None` is used, `(0, 0, target_width, target_height)` is set instead.
-    /// - With `Some(..)`, the values in the tuple are `(x, y, width, height)`.
-    pub mask_rect: Option<SubRect>,
-
-    /// Divide the source buffer into multiple vertical sections and repeat the chosen section to fill the area.
-    ///
-    /// This is only used when [`BlitOptions::area`] is set.
-    pub vertical_slice: Option<Slice>,
-
-    /// Divide the source buffer into multiple horizontal sections and repeat the chosen section to fill the area.
-    ///
-    /// This is only used when [`BlitOptions::area`] is set.
-    pub horizontal_slice: Option<Slice>,
+    /// View on the source to draw.
+    view: SubRect,
 }
 
-impl BlitOptions {
-    /// Setup options for blitting at position `(0, 0)`.
-    ///
-    /// When no other fields are changed or methods are called this will render the full source.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Setup options for blitting at position `(x, y)`.
-    ///
-    /// When no other fields are changed or methods are called this will render the full source.
-    ///
-    /// # Sets field(s)
-    ///
-    /// - [`BlitOptions::x`]
-    /// - [`BlitOptions::y`]
-    #[must_use]
-    pub fn new_position<X, Y>(x: X, y: Y) -> Self
-    where
-        X: ToPrimitive,
-        Y: ToPrimitive,
-    {
-        let (x, y) = (x.to_i32().unwrap_or(0), y.to_i32().unwrap_or(0));
-
-        Self {
-            x,
-            y,
-            ..Default::default()
-        }
-    }
-
-    /// Setup options for blitting at position `(x, y)`.
-    ///
-    /// When no other fields are changed or methods are called this will render the full source.
-    ///
-    /// # Sets field(s)
-    ///
-    /// - [`BlitOptions::x`]
-    /// - [`BlitOptions::y`]
-    #[must_use]
-    pub fn new_position_tuple<X, Y>((x, y): (X, Y)) -> Self
-    where
-        X: ToPrimitive,
-        Y: ToPrimitive,
-    {
-        let (x, y) = (x.to_i32().unwrap_or(0), y.to_i32().unwrap_or(0));
-
-        Self {
-            x,
-            y,
-            ..Default::default()
-        }
-    }
-
-    /// Set the size of the area `(width, height)` on the destination buffer.
-    ///
-    /// - When the area is smaller than the source buffer it effectively functions as the width and height parameters of [`BlitOptions::sub_rect`].
-    /// - When the area is bigger than the source buffer the default behaviour will be tiling.
-    ///
-    /// # Sets field(s)
-    ///
-    /// - [`BlitOptions::area`]
-    #[must_use]
-    pub fn with_area<S>(mut self, area: S) -> Self
-    where
-        S: Into<Size>,
-    {
-        self.set_area(area.into());
-
-        self
-    }
-
-    /// Set which part of the source buffer to render.
-    ///
-    /// - When `None` is used, `(0, 0, source_width, source_height)` is set instead.
-    /// - With `Some(..)`, the values in the tuple are `(x, y, width, height)`.
-    ///
-    /// This is similar to UV coordinates but instead of relative positions in the range of `0..1` this takes absolute positions in the range `0..width` for horizontal positions and `0..height` for vertical positions.
-    ///
-    /// # Sets field(s)
-    ///
-    /// - [`BlitOptions::sub_rect`]
-    /// - [`BlitOptions::area`] to `(width, height)` if it's `None`
-    #[must_use]
-    pub fn with_sub_rect<R>(mut self, sub_rect: R) -> Self
-    where
-        R: Into<SubRect>,
-    {
-        self.set_sub_rect(sub_rect.into());
-
-        self
-    }
-
-    /// Draw as a scalable [9-slice graphic](https://en.wikipedia.org/wiki/9-slice_scaling).
-    ///
-    /// The sub-rectangle of the center piece that will be scaled needs to be passed.
-    /// Note that the rectangle has a width and a height instead of the absolute coordinates the other slice functions accept.
-    ///
-    /// # Sets field(s)
-    ///
-    /// - [`BlitOptions::vertical_slice`]
-    /// - [`BlitOptions::horizontal_slice`]
-    #[must_use]
-    pub fn with_slice9<R>(mut self, center: R) -> Self
-    where
-        R: Into<SubRect>,
-    {
-        self.set_slice9(center);
-
-        self
-    }
-
-    /// Scale a single horizontal piece of the buffer while keeping the other parts the same height.
-    ///
-    /// See [`crate::slice::Slice`] for more information.
-    ///
-    /// # Sets field(s)
-    ///
-    /// - [`BlitOptions::horizontal_slice`]
-    pub fn with_horizontal_slice(mut self, slice: Slice) -> Self {
-        self.horizontal_slice = Some(slice);
-
-        self
-    }
-
-    /// Scale a single vertical piece of the buffer while keeping the other parts the same height.
-    ///
-    /// # Sets field(s)
-    ///
-    /// - [`BlitOptions::vertical_slice`]
-    pub fn with_vertical_slice(mut self, slice: Slice) -> Self {
-        self.vertical_slice = Some(slice);
-
-        self
-    }
-
+impl<'a, 'b, B: Blit> BlitPipeline<'a, 'b, B> {
     /// Set the render position on the target `(x, y)`.
-    ///
-    /// # Sets field(s)
-    ///
-    /// - [`BlitOptions::x`]
-    /// - [`BlitOptions::y`]
-    #[must_use]
-    pub fn with_position<X, Y>(mut self, x: X, y: Y) -> Self
+    #[must_use = "call `.draw()` to blit"]
+    pub fn position<P>(mut self, position: P) -> Self
     where
-        X: ToPrimitive,
-        Y: ToPrimitive,
+        P: Into<Coordinate>,
     {
-        self.x = x.to_i32().unwrap_or_default();
-        self.y = y.to_i32().unwrap_or_default();
+        self.pos = position.into();
 
         self
-    }
-
-    /// Set the position `(x, y)`.
-    ///
-    /// # Sets field(s)
-    ///
-    /// - [`BlitOptions::x`]
-    /// - [`BlitOptions::y`]
-    pub fn set_position<P>(&mut self, position: P)
-    where
-        P: Into<(i32, i32)>,
-    {
-        let (x, y) = position.into();
-
-        self.x = x;
-        self.y = y;
-    }
-
-    /// Get the position `(x, y)`.
-    pub fn position(&self) -> (i32, i32) {
-        (self.x, self.y)
-    }
-
-    /// Get the destination area `(width, height)`.
-    ///
-    /// If [`BlitOptions::area`] is `None` the size of the source will be returned.
-    pub fn area<S>(&self, source_size: S) -> Size
-    where
-        S: Into<Size>,
-    {
-        self.area.unwrap_or(source_size.into())
-    }
-
-    /// Set which part of the source buffer to render.
-    ///
-    /// - When `None` is used, `(0, 0, source_width, source_height)` is set instead.
-    /// - With `Some(..)`, the values in the tuple are `(x, y, width, height)`.
-    ///
-    /// This is similar to UV coordinates but instead of relative positions in the range of `0..1` this takes absolute positions in the range `0..width` for horizontal positions and `0..height` for vertical positions.
-    ///
-    /// # Sets field(s)
-    ///
-    /// - [`BlitOptions::sub_rect`]
-    /// - [`BlitOptions::area`] to `(width, height)` if it's `None`
-    pub fn set_sub_rect<R>(&mut self, sub_rect: R)
-    where
-        R: Into<SubRect>,
-    {
-        let sub_rect = sub_rect.into();
-        self.sub_rect = Some(sub_rect);
-
-        // Don't tile the image when only the subrectangle is set
-        if self.area.is_none() {
-            self.area = Some(sub_rect.size);
-        }
-    }
-
-    /// Get the source area sub rectangle `(x, y, width, height)`.
-    ///
-    /// - If [`BlitOptions::sub_rect`] is `None` the size of the source will be returned with `(0, 0)` as the position.
-    /// - If [`BlitOptions::sub_rect`] and [`BlitOptions::area`] are set it, the `width` and `height` will be shrunk to match those of the area.
-    pub fn sub_rect<S>(&self, source_size: S) -> SubRect
-    where
-        S: Into<Size>,
-    {
-        // Get the sub rectangle defined or from the source
-        let mut sub_rect = self
-            .sub_rect
-            .unwrap_or_else(|| SubRect::from_size(source_size));
-
-        // The sub rectangle is never allowed to be bigger than the area
-        sub_rect.size = match self.area {
-            Some(area) => sub_rect.size.min(area),
-            None => sub_rect.size,
-        };
-
-        sub_rect
     }
 
     /// Set the size of the area `(width, height)` on the destination buffer.
     ///
     /// - When the area is smaller than the source buffer it effectively functions as the width and height parameters of [`BlitOptions::sub_rect`].
     /// - When the area is bigger than the source buffer the default behaviour will be tiling.
-    ///
-    /// # Sets field(s)
-    ///
-    /// - [`BlitOptions::area`]
-    pub fn set_area<S>(&mut self, area: S)
+    #[must_use = "call `.draw()` to blit"]
+    pub fn area<S>(mut self, area: S) -> Self
     where
         S: Into<Size>,
     {
-        self.area = Some(area.into());
+        self
+    }
+
+    /// Set which part of the source buffer to render.
+    #[must_use = "call `.draw()` to blit"]
+    pub fn sub_rect<R>(mut self, sub_rect: R) -> Self
+    where
+        R: Into<SubRect>,
+    {
+        self.view = sub_rect.into();
+
+        self
+    }
+
+    /// Set which part of the target buffer to render.
+    #[must_use = "call `.draw()` to blit"]
+    pub fn mask<R>(mut self, mask: R) -> Self
+    where
+        R: Into<SubRect>,
+    {
+        self
     }
 
     /// Draw as a scalable [9-slice graphic](https://en.wikipedia.org/wiki/9-slice_scaling).
     ///
     /// The sub-rectangle of the center piece that will be scaled needs to be passed.
     /// Note that the rectangle has a width and a height instead of the absolute coordinates the other slice functions accept.
-    ///
-    /// # Sets field(s)
-    ///
-    /// - [`BlitOptions::vertical_slice`]
-    /// - [`BlitOptions::horizontal_slice`]
-    pub fn set_slice9<R>(&mut self, center: R)
+    #[must_use = "call `.draw()` to blit"]
+    pub fn slice9<R>(mut self, center: R) -> Self
     where
         R: Into<SubRect>,
     {
-        let center = center.into();
-
-        self.vertical_slice = Some(Slice::ternary(center.x, center.right()));
-        self.horizontal_slice = Some(Slice::ternary(center.y, center.bottom()));
+        self
     }
 
     /// Scale a single horizontal piece of the buffer while keeping the other parts the same height.
-    ///
-    /// See [`crate::slice::Slice`] for more information.
-    ///
-    /// # Sets field(s)
-    ///
-    /// - [`BlitOptions::horizontal_slice`]
-    pub fn set_horizontal_slice(&mut self, slice: Slice) {
-        self.horizontal_slice = Some(slice);
+    #[must_use = "call `.draw()` to blit"]
+    pub fn horizontal_slice(mut self, slice: Slice) -> Self {
+        self
     }
 
     /// Scale a single vertical piece of the buffer while keeping the other parts the same height.
-    ///
-    /// # Sets field(s)
-    ///
-    /// - [`BlitOptions::vertical_slice`]
-    pub fn set_vertical_slice(&mut self, slice: Slice) {
-        self.vertical_slice = Some(slice);
+    #[must_use = "call `.draw()` to blit"]
+    pub fn vertical_slice(mut self, slice: Slice) -> Self {
+        self
+    }
+
+    /// Render the result.
+    pub fn draw(&mut self) {
+        self.source.blit_impl(
+            &mut self.target,
+            self.target_size.width as usize,
+            self.pos.x as usize,
+            self.pos.y as usize,
+            self.view.x as usize,
+            self.view.y as usize,
+            self.view.width() as usize,
+            self.view.height() as usize,
+        );
+    }
+
+    /// Construct a new pipeline with defaults.
+    pub(crate) fn new(source: &'a B, target: &'b mut [Color], target_size: Size) -> Self {
+        let pos = Coordinate::new(0, 0);
+        let view = SubRect::new(0, 0, source.size());
+
+        Self {
+            source,
+            target,
+            target_size,
+            pos,
+            view,
+        }
     }
 }
 
@@ -510,6 +314,7 @@ impl BlitBuffer {
         &mut self.data
     }
 
+    /*
     /// Divide the target area into given slices of rectangles to draw.
     ///
     /// A `(source, target)` rectangle tuple is returned.
@@ -550,11 +355,13 @@ impl BlitBuffer {
             }
         }
     }
+    */
 
+    /*
     /// Blit a sliced section.
     fn blit_slice(&self, dst: &mut [u32], dst_size: Size, options: &BlitOptions) {
         // If the size of the image is the same as our buffer and the location is zero we can completely blit all bytes
-        if options.x == 0 && options.y == 0 && dst_size == self.size {
+        if options.x == 0 && options.y == 0 && dst_size == self.size && options.mask.is_none() {
             let pixels = dst_size.pixels();
             self.blit_horizontal(dst, 0..pixels, 0..pixels);
 
@@ -562,14 +369,34 @@ impl BlitBuffer {
         }
 
         // Convert the destination to view so we can calculate with it
-        let dst_view = ImageView::full(dst_size);
+        let mut dst_view = ImageView::full(dst_size);
+
+        // Take the mask view if applicable and translate the position
+        let (x, y) = if let Some(mask) = options.mask {
+            if let Some(masked_view) = dst_view.sub(mask) {
+                // Translate the position relative to the new view
+                let x = options.x - mask.x;
+                let y = options.y - mask.y;
+                dbg!(x, y);
+
+                // Set the new view
+                dst_view = masked_view;
+
+                (x, y)
+            } else {
+                // Nothing to render
+                return;
+            }
+        } else {
+            (options.x, options.y)
+        };
 
         // Convert our source to a view
         let src_view = ImageView::full(self.size);
 
         // Find a view on the dst based on the area
         let area = options.area(self.size);
-        let dst_area = match dst_view.sub_i32(options.x, options.y, area) {
+        let mut dst_area = match dst_view.sub_i32(options.x, options.y, area) {
             Some(dst_area) => dst_area,
             None => return,
         };
@@ -599,8 +426,8 @@ impl BlitBuffer {
                 // Fully render the filled tiles
                 for tile_y in 0..tiles.height {
                     let options = BlitOptions::new_position(
-                        options.x + (tile_x * sub_rect_view.width()) as i32,
-                        options.y + (tile_y * sub_rect_view.height()) as i32,
+                        x + (tile_x * sub_rect_view.width()) as i32,
+                        y + (tile_y * sub_rect_view.height()) as i32,
                     )
                     .with_sub_rect(sub_rect_view.as_sub_rect());
 
@@ -610,8 +437,8 @@ impl BlitBuffer {
                 if remainder.height > 0 {
                     // Render the horizontal remainder
                     let options = BlitOptions::new_position(
-                        options.x + (tile_x * sub_rect_view.width()) as i32,
-                        options.y + (tiles.height * sub_rect_view.height()) as i32,
+                        x + (tile_x * sub_rect_view.width()) as i32,
+                        y + (tiles.height * sub_rect_view.height()) as i32,
                     )
                     .with_sub_rect(sub_rect_view.as_sub_rect())
                     .with_area((sub_rect_view.width(), remainder.height));
@@ -624,8 +451,8 @@ impl BlitBuffer {
                 // Render the vertical remainder
                 for tile_y in 0..tiles.height {
                     let options = BlitOptions::new_position(
-                        options.x + (tiles.width * sub_rect_view.width()) as i32,
-                        options.y + (tile_y * sub_rect_view.height()) as i32,
+                        x + (tiles.width * sub_rect_view.width()) as i32,
+                        y + (tile_y * sub_rect_view.height()) as i32,
                     )
                     .with_sub_rect(sub_rect_view.as_sub_rect())
                     .with_area((remainder.width, sub_rect_view.height()));
@@ -636,8 +463,8 @@ impl BlitBuffer {
                 if remainder.height > 0 {
                     // Render the single leftover remainder
                     let options = BlitOptions::new_position(
-                        options.x + (tiles.width * sub_rect_view.width()) as i32,
-                        options.y + (tiles.height * sub_rect_view.height()) as i32,
+                        x + (tiles.width * sub_rect_view.width()) as i32,
+                        y + (tiles.height * sub_rect_view.height()) as i32,
                     )
                     .with_sub_rect(sub_rect_view.as_sub_rect())
                     .with_area(remainder);
@@ -647,6 +474,7 @@ impl BlitBuffer {
             }
         }
     }
+        */
 
     /// Blit a horizontal strip.
     fn blit_horizontal(&self, dst: &mut [u32], dst_index: Range<usize>, blit_index: Range<usize>) {
@@ -677,6 +505,34 @@ impl BlitBuffer {
 }
 
 impl Blit for BlitBuffer {
+    fn size(&self) -> Size {
+        self.size
+    }
+
+    fn blit_impl(
+        &self,
+        target: &mut [Color],
+        target_width: usize,
+        x: usize,
+        y: usize,
+        u: usize,
+        v: usize,
+        width: usize,
+        height: usize,
+    ) {
+        let source_width = self.width() as usize;
+        for i in 0..height {
+            let x_source = (i + v) * source_width + u;
+            let x_target = (i + y) * target_width + x;
+            self.blit_horizontal(
+                target,
+                x_target..(x_target + width),
+                x_source..(x_source + width),
+            )
+        }
+    }
+
+    /*
     fn blit(&self, dst: &mut [u32], dst_size: Size, options: &BlitOptions) {
         // Get the total area we need to draw the slices in
         let area = options.area(self.size);
@@ -707,6 +563,7 @@ impl Blit for BlitBuffer {
             });
         }
     }
+    */
 }
 
 impl std::fmt::Debug for BlitBuffer {

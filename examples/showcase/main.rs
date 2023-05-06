@@ -1,4 +1,9 @@
-use blit::{geom::Size, geom::SubRect, slice::Slice, Blit, BlitBuffer, BlitOptions, ToBlitBuffer};
+use blit::{
+    geom::SubRect,
+    geom::{Coordinate, Size},
+    slice::Slice,
+    Blit, BlitBuffer, ToBlitBuffer,
+};
 
 use num_traits::ToPrimitive;
 use pixels::{PixelsBuilder, SurfaceTexture};
@@ -25,32 +30,28 @@ const CHAR_SIZE: Size = Size {
 };
 
 /// Show the text for clicking.
-fn frame0(
+fn frame_intro(
     dst: &mut [u32],
     _buf: &BlitBuffer,
     _scalable_buf: &BlitBuffer,
     font: &BlitBuffer,
-    _mouse: (i32, i32),
+    _mouse: Coordinate,
 ) {
     draw_text(dst, font, 0, "This is an interactive showcase of the\n'blit' crate, you can interact with the\nrendering by moving the cursor\n\nGo to the next showcase item by clicking\nthe left mouse button\n\nGo to the previous showcase item by\nclicking the right mouse button");
 }
 
 /// Draw the sprite completely.
-fn frame1(
+fn frame_complete(
     dst: &mut [u32],
     buf: &BlitBuffer,
     _scalable_buf: &BlitBuffer,
     font: &BlitBuffer,
-    mouse: (i32, i32),
+    mouse: Coordinate,
 ) {
-    let (center_x, center_y) = (DST_SIZE / 2 - buf.size() / 2).as_tuple();
+    let center = (DST_SIZE / 2 - buf.size() / 2).as_tuple();
 
-    buf.blit(
-        dst,
-        DST_SIZE,
-        &BlitOptions::new_position(center_x, center_y),
-    );
-    buf.blit(dst, DST_SIZE, &BlitOptions::new_position_tuple(mouse));
+    buf.blit(dst, DST_SIZE).position(center).draw();
+    buf.blit(dst, DST_SIZE).position(mouse).draw();
 
     draw_text(dst, font, 0, "Blit the full sprite");
     draw_text(
@@ -62,23 +63,21 @@ fn frame1(
 }
 
 /// Draw the left half of the sprite using the area option.
-fn frame2(
+fn frame_area(
     dst: &mut [u32],
     buf: &BlitBuffer,
     _scalable_buf: &BlitBuffer,
     font: &BlitBuffer,
-    mouse: (i32, i32),
+    mouse: Coordinate,
 ) {
-    let (center_x, center_y) = (DST_SIZE / 2 - buf.size() / 2).as_tuple();
+    let center = (DST_SIZE / 2 - buf.size() / 2).as_coordinate();
     let mut sprite_size = buf.size();
-    sprite_size.width = (mouse.0 - center_x as i32).clamp(0, buf.width() as i32) as u32;
+    sprite_size.width = (mouse.x - center.x as i32).clamp(0, buf.width() as i32) as u32;
 
-    buf.blit(
-        dst,
-        DST_SIZE,
-        &BlitOptions::new_position(center_x, center_y)
-            .with_sub_rect(SubRect::from_size(sprite_size)),
-    );
+    buf.blit(dst, DST_SIZE)
+        .position(center)
+        .area(sprite_size)
+        .draw();
 
     draw_text(
         dst,
@@ -95,23 +94,19 @@ fn frame2(
 }
 
 /// Draw the top half of the sprite by taking a sub rectangle from it.
-fn frame3(
+fn frame_sub_rect(
     dst: &mut [u32],
     buf: &BlitBuffer,
     _scalable_buf: &BlitBuffer,
     font: &BlitBuffer,
-    mouse: (i32, i32),
+    mouse: Coordinate,
 ) {
-    let (center_x, center_y) = (DST_SIZE / 2 - buf.size() / 2).as_tuple();
+    let center = (DST_SIZE / 2 - buf.size() / 2).as_coordinate();
     let mut sprite_size = buf.size();
-    sprite_size.height = (mouse.1 - center_y as i32).clamp(0, buf.height() as i32) as u32;
+    sprite_size.height = (mouse.y - center.y).clamp(0, buf.height() as i32) as u32;
 
-    buf.blit(
-        dst,
-        DST_SIZE,
-        &BlitOptions::new_position(center_x, center_y)
-            .with_sub_rect(SubRect::from_size(sprite_size)),
-    );
+    buf.blit(dst, DST_SIZE).position(center);
+    todo!();
 
     draw_text(
         dst,
@@ -127,8 +122,9 @@ fn frame3(
     );
 }
 
+/*
 /// Draw the middle section of the sprite by taking a sub rectangle from it.
-fn frame4(
+fn frame_sub_rect2(
     dst: &mut [u32],
     buf: &BlitBuffer,
     _scalable_buf: &BlitBuffer,
@@ -163,7 +159,7 @@ fn frame4(
 }
 
 /// Draw the full sprite tiled multiple times for each dimension.
-fn frame5(
+fn frame_area2(
     dst: &mut [u32],
     buf: &BlitBuffer,
     _scalable_buf: &BlitBuffer,
@@ -196,7 +192,7 @@ fn frame5(
 }
 
 /// Draw a sub-rectangle of the sprite tiled multiple times for each dimension.
-fn frame6(
+fn frame_tiled(
     dst: &mut [u32],
     buf: &BlitBuffer,
     _scalable_buf: &BlitBuffer,
@@ -231,7 +227,7 @@ fn frame6(
 }
 
 /// Draw the full sprite as slice9 scaling.
-fn frame7(
+fn frame_slice9(
     dst: &mut [u32],
     _buf: &BlitBuffer,
     scalable_buf: &BlitBuffer,
@@ -266,7 +262,7 @@ fn frame7(
 }
 
 /// Draw the full sprite split in half scaling the left side.
-fn frame8(
+fn frame_vertical_slice(
     dst: &mut [u32],
     buf: &BlitBuffer,
     _scalable_buf: &BlitBuffer,
@@ -297,6 +293,37 @@ fn frame8(
     );
 }
 
+/// Draw the sprite completely with a mask.
+fn frame_mask(
+    dst: &mut [u32],
+    buf: &BlitBuffer,
+    _scalable_buf: &BlitBuffer,
+    font: &BlitBuffer,
+    mouse: (i32, i32),
+) {
+    let (center_x, center_y) = (DST_SIZE / 2 - buf.size() / 2).as_tuple();
+
+    buf.blit(
+        dst,
+        DST_SIZE,
+        &BlitOptions::new_position(center_x, center_y).with_mask((mouse.0, mouse.1, 200, 200)),
+    );
+
+    draw_text(
+        dst,
+        font,
+        0,
+        "Blit the full sprite with a mask on the\ntarget buffer",
+    );
+    draw_text(
+        dst,
+        font,
+        DST_SIZE.height - CHAR_SIZE.height * 2,
+        "BlitOptions::new(mouse)\n\t.with_mask((mouse_x, mouse_y, 10, 10))",
+    );
+}
+*/
+
 /// Draw an ASCII string.
 fn draw_text(dst: &mut [u32], font: &BlitBuffer, y: impl ToPrimitive, text: &str) {
     // First character in the image
@@ -326,11 +353,10 @@ fn draw_text(dst: &mut [u32], font: &BlitBuffer, y: impl ToPrimitive, text: &str
         let char_offset = (ch as u8 - char_start as u8) as u32 * CHAR_SIZE.width;
 
         // Draw the character
-        font.blit(
-            dst,
-            DST_SIZE,
-            &BlitOptions::new_position(x, y).with_sub_rect(SubRect::new(char_offset, 0, CHAR_SIZE)),
-        );
+        font.blit(dst, DST_SIZE)
+            .position((x, y))
+            .sub_rect(SubRect::new(char_offset, 0, CHAR_SIZE))
+            .draw();
     });
 }
 
@@ -390,14 +416,25 @@ async fn run() {
     .unwrap();
 
     // Cursor position
-    let mut mouse = (0, 0);
+    let mut mouse = Coordinate::new(0, 0);
 
     // Which frame to draw
     let mut current_frame = 0;
 
     // All frame drawing functions, cycled by clicking
-    let frames: Vec<fn(&mut [u32], &BlitBuffer, &BlitBuffer, &BlitBuffer, (i32, i32))> = vec![
-        frame0, frame1, frame2, frame3, frame4, frame5, frame6, frame7, frame8,
+    let frames: Vec<fn(&mut [u32], &BlitBuffer, &BlitBuffer, &BlitBuffer, Coordinate)> = vec![
+        frame_intro,
+        frame_complete,
+        /*
+        frame_area,
+        frame_sub_rect,
+        frame_sub_rect2,
+        frame_area2,
+        frame_tiled,
+        frame_slice9,
+        frame_vertical_slice,
+        frame_mask,
+        */
     ];
 
     // Keep track of how long each frame takes to render
@@ -473,8 +510,8 @@ async fn run() {
                 let mouse_pos = pixels
                     .window_pos_to_pixel((position.x as f32, position.y as f32))
                     .unwrap_or_default();
-                mouse.0 = mouse_pos.0 as i32;
-                mouse.1 = mouse_pos.1 as i32;
+                mouse.x = mouse_pos.0 as i32;
+                mouse.y = mouse_pos.1 as i32;
 
                 // Draw another frame
                 window.request_redraw();

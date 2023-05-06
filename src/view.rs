@@ -4,7 +4,7 @@ use num_traits::ToPrimitive;
 
 use crate::{Size, SubRect};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ImageView(SubRect);
 
 impl ImageView {
@@ -115,6 +115,15 @@ impl ImageView {
         Self::new((x, y, new_width, new_height), self.as_sub_rect())
     }
 
+    /// Shift the left and top position while keeping the right and bottom position at the same spot.
+    pub fn shift<X, Y>(&self, new_x: X, new_y: Y) -> Self
+    where
+        X: ToPrimitive,
+        Y: ToPrimitive,
+    {
+        Self(self.0.shift(new_x, new_y))
+    }
+
     /// Get the amount of X pixels.
     pub fn width(&self) -> u32 {
         self.0.width()
@@ -123,6 +132,16 @@ impl ImageView {
     /// Get the amount of Y pixels.
     pub fn height(&self) -> u32 {
         self.0.height()
+    }
+
+    /// X position.
+    pub fn x(&self) -> i32 {
+        self.0.x
+    }
+
+    /// Y position.
+    pub fn y(&self) -> i32 {
+        self.0.y
     }
 
     /// Get our data as the subrectangle.

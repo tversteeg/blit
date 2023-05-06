@@ -6,7 +6,54 @@ use num_traits::ToPrimitive;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-/// Helper struct for defining sizes.
+/// Coordinates, used for UV and offsets.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Coordinate {
+    /// X position in pixels.
+    pub x: i32,
+    /// Y position in pixels.
+    pub y: i32,
+}
+
+impl Coordinate {
+    /// Create a new size.
+    pub fn new<X, Y>(x: X, y: Y) -> Self
+    where
+        X: ToPrimitive,
+        Y: ToPrimitive,
+    {
+        let x = x.to_i32().unwrap_or_default();
+        let y = y.to_i32().unwrap_or_default();
+
+        Self { x, y }
+    }
+
+    /// Create from a `i32` tuple.
+    pub const fn from_tuple((x, y): (i32, i32)) -> Self {
+        Self { x, y }
+    }
+
+    /// Tuple of `(x, y)`.
+    pub const fn as_tuple(&self) -> (i32, i32) {
+        (self.x, self.y)
+    }
+}
+
+impl<X, Y> From<(X, Y)> for Coordinate
+where
+    X: ToPrimitive,
+    Y: ToPrimitive,
+{
+    fn from((x, y): (X, Y)) -> Self {
+        let x = x.to_i32().unwrap_or_default();
+        let y = y.to_i32().unwrap_or_default();
+
+        Self { x, y }
+    }
+}
+
+/// Sizes.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Size {
@@ -37,6 +84,14 @@ impl Size {
     /// Tuple of `(width, height)`.
     pub const fn as_tuple(&self) -> (u32, u32) {
         (self.width, self.height)
+    }
+
+    /// `(width, height)` -> `(x, y)`.
+    pub const fn as_coordinate(&self) -> Coordinate {
+        Coordinate {
+            x: self.width as i32,
+            y: self.height as i32,
+        }
     }
 
     /// Amount of pixels.
@@ -186,6 +241,16 @@ pub struct SubRect {
 }
 
 impl SubRect {
+    /// Zero sized.
+    pub const ZERO: Self = Self {
+        x: 0,
+        y: 0,
+        size: Size {
+            width: 0,
+            height: 0,
+        },
+    };
+
     /// Create a new sub-rectangle.
     pub fn new<X, Y, S>(x: X, y: Y, size: S) -> Self
     where
