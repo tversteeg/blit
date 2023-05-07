@@ -2,10 +2,10 @@ use std::ops::Range;
 
 use num_traits::ToPrimitive;
 
-use crate::{Size, SubRect};
+use crate::{Rect, Size};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct ImageView(SubRect);
+pub(crate) struct ImageView(Rect);
 
 impl ImageView {
     /// Create a new view based on the size of the original buffer.
@@ -13,8 +13,8 @@ impl ImageView {
     /// When it's `None` the view doesn't contain any actual pixels.
     pub fn new<T, P>(target: T, parent: P) -> Option<Self>
     where
-        T: Into<SubRect>,
-        P: Into<SubRect>,
+        T: Into<Rect>,
+        P: Into<Rect>,
     {
         let (target, parent) = (target.into(), parent.into());
 
@@ -59,12 +59,12 @@ impl ImageView {
         X: ToPrimitive,
         Y: ToPrimitive,
     {
-        Self(SubRect::new(x, y, size))
+        Self(Rect::new(x, y, size))
     }
 
     /// Create a full view of a complete buffer without checking if it fits in the parent.
     pub fn full(size: Size) -> Self {
-        Self(SubRect { x: 0, y: 0, size })
+        Self(Rect { x: 0, y: 0, size })
     }
 
     /// Iterator over horizontal ranges in the buffer the view is based on.
@@ -72,18 +72,7 @@ impl ImageView {
     /// Each range represents a slice of bytes that can be taken.
     /// Bounds checks should have already been done by the new function.
     pub fn parent_ranges_iter(&self, parent_size: Size) -> impl Iterator<Item = Range<usize>> {
-        let (width, height) = (self.0.width() as usize, self.0.height() as usize);
-        let (start_x, start_y) = (self.0.x as usize, self.0.y as usize);
-        let end_y = start_y + height;
-
-        let parent_width = parent_size.width as usize;
-
-        (start_y..end_y).map(move |y| {
-            let start_x = y * parent_width + start_x;
-            let end_x = start_x + width;
-
-            start_x..end_x
-        })
+        self.0.parent_ranges_iter(parent_size)
     }
 
     /// Size in pixels.
@@ -94,7 +83,7 @@ impl ImageView {
     /// Create a sub-view based on this view.
     pub fn sub<S>(&self, target: S) -> Option<Self>
     where
-        S: Into<SubRect>,
+        S: Into<Rect>,
     {
         Self::new(target, self.as_sub_rect())
     }
@@ -145,7 +134,7 @@ impl ImageView {
     }
 
     /// Get our data as the subrectangle.
-    pub fn as_sub_rect(&self) -> SubRect {
+    pub fn as_sub_rect(&self) -> Rect {
         self.0
     }
 }

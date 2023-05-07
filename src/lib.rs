@@ -12,7 +12,7 @@
 //!
 //! ```
 //! # #[cfg(feature = "image")] mod test {
-//! use blit::{Blit, ToBlitBuffer, BlitOptions, geom::Size};
+//! use blit::{Blit, ToBlitBuffer, geom::Size};
 //!
 //! const CANVAS_SIZE: Size = Size { width: 180, height: 180 };
 //! const MASK_COLOR: u32 = 0xFF_00_FF;
@@ -28,14 +28,15 @@
 //! let blit_buffer = img.to_blit_buffer_with_mask_color(MASK_COLOR);
 //!
 //! // Draw the image 2 times to the buffer
-//! blit_buffer.blit(&mut canvas, CANVAS_SIZE, &BlitOptions::new_position(10, 10));
-//! blit_buffer.blit(&mut canvas, CANVAS_SIZE, &BlitOptions::new_position(20, 20));
+//! blit_buffer.blit(&mut canvas, CANVAS_SIZE).position((10, 10)).draw();
+//! blit_buffer.blit(&mut canvas, CANVAS_SIZE).position((20, 20)).draw();
 //! # }}
 //! ```
 
 pub mod geom;
 #[cfg(feature = "image")]
 mod image;
+pub mod ops;
 pub mod slice;
 mod view;
 
@@ -48,13 +49,13 @@ pub mod prelude {
     #[cfg(feature = "image")]
     pub use crate::ToBlitBuffer;
     pub use crate::{
-        geom::{Size, SubRect},
+        geom::{Coordinate, Rect, Size},
         slice::Slice,
         Blit, BlitBuffer,
     };
 }
 
-use geom::{Coordinate, Size, SubRect};
+use geom::{Coordinate, Rect, Size};
 
 use std::ops::Range;
 
@@ -117,25 +118,20 @@ pub trait ToBlitBuffer {
     fn to_blit_buffer_with_mask_color(&self, mask_color: u32) -> BlitBuffer;
 }
 
-/// Pipeline for rendering an image on another image.
+/// Pipeline for rendering a source image on a target image.
 ///
 /// This pipeline can be started by calling [`Blit::blit`] on [`BlitBuffer`] which can be created by implementations of the [`ToBlitBuffer`] trait.
 #[derive(Debug)]
 pub struct BlitPipeline<'a, 'b, B: Blit> {
     /// What to blit.
     source: &'a B,
+    /// View on the source buffer.
+    source_view: ImageView,
 
     /// Where to blit it to.
     target: &'b mut [Color],
-
-    /// Target position.
-    pos: Coordinate,
-
-    /// Size of the target.
-    target_size: Size,
-
-    /// View on the source to draw.
-    view: SubRect,
+    /// View on the target buffer.
+    target_view: ImageView,
 }
 
 impl<'a, 'b, B: Blit> BlitPipeline<'a, 'b, B> {
@@ -145,7 +141,8 @@ impl<'a, 'b, B: Blit> BlitPipeline<'a, 'b, B> {
     where
         P: Into<Coordinate>,
     {
-        self.pos = position.into();
+        let position = position.into();
+        self.target_view.shift(position.x, position.y);
 
         self
     }
@@ -162,13 +159,22 @@ impl<'a, 'b, B: Blit> BlitPipeline<'a, 'b, B> {
         self
     }
 
+    /// Offset the position on the source view.
+    #[must_use = "call `.draw()` to blit"]
+    pub fn uv<C>(mut self, uv: C) -> Self
+    where
+        C: Into<Coordinate>,
+    {
+        self
+    }
+
     /// Set which part of the source buffer to render.
     #[must_use = "call `.draw()` to blit"]
     pub fn sub_rect<R>(mut self, sub_rect: R) -> Self
     where
-        R: Into<SubRect>,
+        R: Into<Rect>,
     {
-        self.view = sub_rect.into();
+        todo!();
 
         self
     }
@@ -177,7 +183,7 @@ impl<'a, 'b, B: Blit> BlitPipeline<'a, 'b, B> {
     #[must_use = "call `.draw()` to blit"]
     pub fn mask<R>(mut self, mask: R) -> Self
     where
-        R: Into<SubRect>,
+        R: Into<Rect>,
     {
         self
     }
@@ -189,7 +195,7 @@ impl<'a, 'b, B: Blit> BlitPipeline<'a, 'b, B> {
     #[must_use = "call `.draw()` to blit"]
     pub fn slice9<R>(mut self, center: R) -> Self
     where
-        R: Into<SubRect>,
+        R: Into<Rect>,
     {
         self
     }
@@ -210,28 +216,39 @@ impl<'a, 'b, B: Blit> BlitPipeline<'a, 'b, B> {
     pub fn draw(&mut self) {
         self.source.blit_impl(
             &mut self.target,
-            self.target_size.width as usize,
-            self.pos.x as usize,
-            self.pos.y as usize,
-            self.view.x as usize,
-            self.view.y as usize,
-            self.view.width() as usize,
-            self.view.height() as usize,
+            self.target_view.width() as usize,
+            self.target_view.x() as usize,
+            self.target_view.y() as usize,
+            self.source_view.x() as usize,
+            self.source_view.y() as usize,
+            self.source_view.width() as usize,
+            self.source_view.height() as usize,
         );
     }
 
     /// Construct a new pipeline with defaults.
     pub(crate) fn new(source: &'a B, target: &'b mut [Color], target_size: Size) -> Self {
         let pos = Coordinate::new(0, 0);
-        let view = SubRect::new(0, 0, source.size());
+
+        let target_view = ImageView::new_unchecked(0, 0, target_size);
+        let source_view = ImageView::new_unchecked(0, 0, source.size());
 
         Self {
             source,
+            source_view,
             target,
-            target_size,
-            pos,
-            view,
+            target_view,
         }
+    }
+}
+
+/// A pipeline that's been split over multiple separate rendering parts by operations.
+pub struct SplitPipeline<'a, 'b, B: Blit>(Vec<BlitPipeline<'a, 'b, B>>);
+
+impl<'a, 'b, B: Blit> SplitPipeline<'a, 'b, B> {
+    /// Render the result.
+    pub fn draw(&mut self) {
+        self.0.iter_mut().for_each(BlitPipeline::draw);
     }
 }
 
@@ -596,11 +613,7 @@ mod tests {
             2,
             127,
         );
-        blit.blit(
-            &mut buffer,
-            Size::new(2, 3),
-            &BlitOptions::new_position(0, 0),
-        );
+        blit.blit(&mut buffer, Size::new(2, 3)).draw();
 
         // Create a copy but cast the u32 to a i32
         let expected = [

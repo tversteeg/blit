@@ -1,24 +1,8 @@
 //! Divide the source buffer into multiple sections and repeat the chosen section to fill the area.
-//!
-//! # Example
-//!
-//! ```rust
-//! use blit::{BlitOptions, slice::Slice};
-//!
-//! // Create a slice 9 type split of a 9x9 image in 3 exact parts
-//! BlitOptions {
-//!    vertical_slice: Some(Slice::ternary(3, 6)),
-//!    horizontal_slice: Some(Slice::ternary(3, 6)),
-//!    ..Default::default()
-//! };
-//!
-//! // Although you probably want, note that the right and bottom coordinates are not absolute anymore, here they are the width and height of the center rectangle
-//! BlitOptions::new().with_slice9((3, 3, 3, 3));
-//! ```
 
 use num_traits::ToPrimitive;
 
-use crate::{Size, SubRect};
+use crate::{Rect, Size};
 
 /// Divide the source buffer into multiple sections and repeat the chosen section to fill the area.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -196,17 +180,17 @@ impl SliceProjection {
     }
 
     /// Create a `(source, target)` rectangle tuple with a static Y axis.
-    pub fn into_sub_rects_static_y(self, y_size: u32) -> (SubRect, SubRect) {
-        let source = SubRect::from((self.source_start, 0, self.source_amount(), y_size));
-        let target = SubRect::from((self.target_start, 0, self.target_amount(), y_size));
+    pub fn into_sub_rects_static_y(self, y_size: u32) -> (Rect, Rect) {
+        let source = Rect::from((self.source_start, 0, self.source_amount(), y_size));
+        let target = Rect::from((self.target_start, 0, self.target_amount(), y_size));
 
         (source, target)
     }
 
     /// Create a `(source, target)` rectangle tuple with a static X axis.
-    pub fn into_sub_rects_static_x(self, x_size: u32) -> (SubRect, SubRect) {
-        let source = SubRect::from((0, self.source_start, x_size, self.source_amount()));
-        let target = SubRect::from((0, self.target_start, x_size, self.target_amount()));
+    pub fn into_sub_rects_static_x(self, x_size: u32) -> (Rect, Rect) {
+        let source = Rect::from((0, self.source_start, x_size, self.source_amount()));
+        let target = Rect::from((0, self.target_start, x_size, self.target_amount()));
 
         (source, target)
     }
@@ -215,14 +199,14 @@ impl SliceProjection {
     pub fn combine_into_sub_rects(
         horizontal: &SliceProjection,
         vertical: &SliceProjection,
-    ) -> (SubRect, SubRect) {
-        let source = SubRect::new(
+    ) -> (Rect, Rect) {
+        let source = Rect::new(
             horizontal.source_start,
             vertical.source_start,
             Size::new(horizontal.source_amount(), vertical.source_amount()),
         );
 
-        let target = SubRect::new(
+        let target = Rect::new(
             horizontal.target_start,
             vertical.target_start,
             Size::new(horizontal.target_amount(), vertical.target_amount()),

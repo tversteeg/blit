@@ -1,5 +1,5 @@
 use blit::{
-    geom::SubRect,
+    geom::Rect,
     geom::{Coordinate, Size},
     slice::Slice,
     Blit, BlitBuffer, ToBlitBuffer,
@@ -355,7 +355,7 @@ fn draw_text(dst: &mut [u32], font: &BlitBuffer, y: impl ToPrimitive, text: &str
         // Draw the character
         font.blit(dst, DST_SIZE)
             .position((x, y))
-            .sub_rect(SubRect::new(char_offset, 0, CHAR_SIZE))
+            .sub_rect(Rect::new(char_offset, 0, CHAR_SIZE))
             .draw();
     });
 }

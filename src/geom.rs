@@ -1,6 +1,6 @@
 //! Helper structs for simple geometric calculations.
 
-use std::ops::{Add, Div, Mul, Rem, Sub};
+use std::ops::{Add, Div, Mul, Range, Rem, Sub};
 
 use num_traits::ToPrimitive;
 #[cfg(feature = "serde")]
@@ -50,6 +50,17 @@ where
         let y = y.to_i32().unwrap_or_default();
 
         Self { x, y }
+    }
+}
+
+impl Rem<Coordinate> for Coordinate {
+    type Output = Self;
+
+    fn rem(self, rhs: Coordinate) -> Self::Output {
+        Self {
+            x: self.x % rhs.x,
+            y: self.y % rhs.y,
+        }
     }
 }
 
@@ -231,7 +242,7 @@ impl<T: ToPrimitive> Rem<T> for Size {
 /// A sub-rectangle is a rectangle that's part of a bigger rectangle.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SubRect {
+pub struct Rect {
     /// X offset in pixels.
     pub x: i32,
     /// Y offset in pixels.
@@ -240,7 +251,7 @@ pub struct SubRect {
     pub size: Size,
 }
 
-impl SubRect {
+impl Rect {
     /// Zero sized.
     pub const ZERO: Self = Self {
         x: 0,
@@ -286,7 +297,7 @@ impl SubRect {
         let new_y = new_y.to_i32().unwrap_or_default();
 
         let (right, bottom) = (self.right(), self.bottom());
-        let (x, y) = (new_x.min(right), new_y.min(bottom));
+        let (x, y) = (new_x.clamp(0, right), new_y.clamp(0, bottom));
 
         let size = Size::new((right - self.x).max(0), (bottom - self.y).max(0));
 
@@ -317,9 +328,33 @@ impl SubRect {
     pub fn as_slice(&self) -> (i32, i32, u32, u32) {
         (self.x, self.y, self.size.width, self.size.height)
     }
+
+    /// Iterator over horizontal ranges in the buffer the rect is based on.
+    ///
+    /// Each range represents a slice of bytes that can be taken.
+    /// Bounds checks should have already been done by the new function.
+    pub fn parent_ranges_iter<S>(&self, parent_size: S) -> impl Iterator<Item = Range<usize>>
+    where
+        S: Into<Size>,
+    {
+        let parent_size = parent_size.into();
+
+        let (width, height) = (self.width() as usize, self.height() as usize);
+        let (start_x, start_y) = (self.x.max(0) as usize, self.y.max(0) as usize);
+        let end_y = start_y + height;
+
+        let parent_width = parent_size.width as usize;
+
+        (start_y..end_y).map(move |y| {
+            let start_x = y * parent_width + start_x;
+            let end_x = start_x + width;
+
+            start_x..end_x
+        })
+    }
 }
 
-impl<X, Y, W, H> From<(X, Y, W, H)> for SubRect
+impl<X, Y, W, H> From<(X, Y, W, H)> for Rect
 where
     X: ToPrimitive,
     Y: ToPrimitive,
@@ -334,3 +369,27 @@ where
         Self { x, y, size }
     }
 }
+
+impl Add<Coordinate> for Rect {
+    type Output = Self;
+
+    fn add(mut self, rhs: Coordinate) -> Self::Output {
+        self.x += rhs.x;
+        self.y += rhs.y;
+
+        self
+    }
+}
+
+/*
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rect_shift() {
+        let rect = Rect::new(10, 10, (10, 10));
+        assert_eq!(rect.shift(15, 15), Rect::new(15, 15, (5, 5)));
+    }
+}
+*/
