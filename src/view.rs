@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use num_traits::ToPrimitive;
 
-use crate::{Rect, Size};
+use crate::{prelude::Coordinate, Rect, Size};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ImageView(Rect);
@@ -54,10 +54,11 @@ impl ImageView {
     }
 
     /// Create a new view without checking if it fits in the parent.
-    pub fn new_unchecked<X, Y>(x: X, y: Y, size: Size) -> Self
+    pub fn new_unchecked<X, Y, S>(x: X, y: Y, size: S) -> Self
     where
         X: ToPrimitive,
         Y: ToPrimitive,
+        S: Into<Size>,
     {
         Self(Rect::new(x, y, size))
     }
@@ -105,12 +106,28 @@ impl ImageView {
     }
 
     /// Shift the left and top position while keeping the right and bottom position at the same spot.
-    pub fn shift<X, Y>(&self, new_x: X, new_y: Y) -> Self
+    pub fn shift<X, Y>(&self, new_x: X, new_y: Y) -> (Coordinate, Self)
     where
         X: ToPrimitive,
         Y: ToPrimitive,
     {
-        Self(self.0.shift(new_x, new_y))
+        let (coord, rect) = self.0.shift(new_x, new_y);
+
+        (coord, Self(rect))
+    }
+
+    /// Move the coordinates in a positive direction while keeping the right and bottom edge.
+    pub fn add_coordinate_abs<C>(&mut self, coord: C)
+    where
+        C: Into<Coordinate>,
+    {
+        let coord = coord.into();
+
+        let right = self.0.right();
+        let bottom = self.0.bottom();
+        self.0.x = (self.0.x + coord.x).min(right);
+        self.0.y = (self.0.y + coord.y).min(bottom);
+        self.0.size = Size::new(right - self.0.x, bottom - self.0.y);
     }
 
     /// Get the amount of X pixels.
@@ -197,5 +214,13 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![1010..1020, 1110..1120, 1210..1220]
         );
+    }
+
+    #[test]
+    fn add_coordinate_abs() {
+        let mut rect = ImageView::new_unchecked(10, 10, (10, 10));
+        rect.add_coordinate_abs((5, 2));
+
+        assert_eq!(rect, ImageView::new_unchecked(15, 12, (5, 8)));
     }
 }

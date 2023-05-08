@@ -50,11 +50,9 @@ where
         .parent_ranges_iter(SOURCE_SIZE)
         .zip(target_view.parent_ranges_iter(TARGET_SIZE))
         .for_each(|(source_slice, target_slice)| {
-            if
-                source.pixels()[source_slice.clone()] != 
-                target[target_slice.clone()] {
+            if source.pixels()[source_slice.clone()] != target[target_slice.clone()] {
                 panic!("bytes mismatch at source range {source_slice:?} and target range {target_slice:?}");
-                }
+            }
         });
 }
 

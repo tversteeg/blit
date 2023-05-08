@@ -130,6 +130,8 @@ pub struct BlitPipeline<'a, 'b, B: Blit> {
 
     /// Where to blit it to.
     target: &'b mut [Color],
+    /// Full size of the target buffer.
+    target_size: Size,
     /// View on the target buffer.
     target_view: ImageView,
 }
@@ -142,7 +144,13 @@ impl<'a, 'b, B: Blit> BlitPipeline<'a, 'b, B> {
         P: Into<Coordinate>,
     {
         let position = position.into();
-        self.target_view.shift(position.x, position.y);
+
+        // Shift the image around in the target rectangle
+        let (uv_offset, target_view) = self.target_view.shift(position.x, position.y);
+        self.target_view = target_view;
+
+        // Shift the source by the shifted UV coordinates
+        self.source_view.add_coordinate_abs(uv_offset);
 
         self
     }
@@ -174,8 +182,6 @@ impl<'a, 'b, B: Blit> BlitPipeline<'a, 'b, B> {
     where
         R: Into<Rect>,
     {
-        todo!();
-
         self
     }
 
@@ -214,9 +220,14 @@ impl<'a, 'b, B: Blit> BlitPipeline<'a, 'b, B> {
 
     /// Render the result.
     pub fn draw(&mut self) {
+        assert!(self.target_view.x() >= 0);
+        assert!(self.target_view.y() >= 0);
+        assert!(self.target_view.x() as u32 + self.target_view.width() < self.target_size.width);
+        assert!(self.target_view.y() as u32 + self.target_view.height() < self.target_size.height);
+
         self.source.blit_impl(
             &mut self.target,
-            self.target_view.width() as usize,
+            self.target_size.width as usize,
             self.target_view.x() as usize,
             self.target_view.y() as usize,
             self.source_view.x() as usize,
@@ -237,6 +248,7 @@ impl<'a, 'b, B: Blit> BlitPipeline<'a, 'b, B> {
             source,
             source_view,
             target,
+            target_size,
             target_view,
         }
     }
@@ -494,29 +506,36 @@ impl BlitBuffer {
         */
 
     /// Blit a horizontal strip.
-    fn blit_horizontal(&self, dst: &mut [u32], dst_index: Range<usize>, blit_index: Range<usize>) {
+    fn blit_horizontal(
+        &self,
+        target: &mut [Color],
+        target_index: Range<usize>,
+        source_index: Range<usize>,
+    ) {
         // Same size iterators over both our buffer and the output buffer
-        let blit_iter = self.data[blit_index].iter();
-        let dst_iter = dst[dst_index].iter_mut();
+        let source_iter = self.data[source_index].iter();
+        let target_iter = target[target_index].iter_mut();
 
         // Blit each pixel
-        dst_iter.zip(blit_iter).for_each(|(dst_pixel, blit_pixel)| {
-            *dst_pixel = Self::blit_pixel(*dst_pixel, *blit_pixel);
-        });
+        target_iter
+            .zip(source_iter)
+            .for_each(|(target_pixel, source_pixel)| {
+                *target_pixel = Self::blit_pixel(*target_pixel, *source_pixel);
+            });
     }
 
     /// Blit a single pixel.
     ///
     /// The main logic of calculating the resulting color that needs to be drawn.
     #[inline(always)]
-    fn blit_pixel(dst_pixel: Color, blit_pixel: Color) -> Color {
+    fn blit_pixel(target_pixel: Color, source_pixel: Color) -> Color {
         // Set the pixel from the blit image if the mask value is set
-        if (blit_pixel >> 24) > 0 {
+        if (source_pixel >> 24) > 0 {
             // Pixel from the blit buffer is not masked, use it
-            blit_pixel
+            source_pixel
         } else {
             // Pixel from the blit buffer is masked, use the original color
-            dst_pixel
+            target_pixel
         }
     }
 }
@@ -537,10 +556,13 @@ impl Blit for BlitBuffer {
         width: usize,
         height: usize,
     ) {
-        let source_width = self.width() as usize;
+        if width < 800 {
+            dbg!(x, y, u, v, width, height);
+        }
+        let source_width = self.size().width as usize;
         for i in 0..height {
-            let x_source = (i + v) * source_width + u;
-            let x_target = (i + y) * target_width + x;
+            let x_target = (y + i) * target_width + x;
+            let x_source = (v + i) * source_width + u;
             self.blit_horizontal(
                 target,
                 x_target..(x_target + width),

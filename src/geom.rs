@@ -287,8 +287,10 @@ impl Rect {
         Self { x, y, size }
     }
 
-    /// Shift the left and top position while keeping the right and bottom position at the same spot.
-    pub fn shift<X, Y>(&self, new_x: X, new_y: Y) -> Self
+    /// Shift position while staying inside the rectangle already defined.
+    ///
+    /// The size returned is the shifted UV coordinate.
+    pub fn shift<X, Y>(&self, new_x: X, new_y: Y) -> (Coordinate, Self)
     where
         X: ToPrimitive,
         Y: ToPrimitive,
@@ -296,12 +298,31 @@ impl Rect {
         let new_x = new_x.to_i32().unwrap_or_default();
         let new_y = new_y.to_i32().unwrap_or_default();
 
-        let (right, bottom) = (self.right(), self.bottom());
-        let (x, y) = (new_x.clamp(0, right), new_y.clamp(0, bottom));
+        let (x, u, width) = if new_x < self.x {
+            let u = self.x - new_x;
 
-        let size = Size::new((right - self.x).max(0), (bottom - self.y).max(0));
+            (self.x, u, self.width() - u as u32)
+        } else {
+            let right = self.right();
+            let x = new_x.min(right);
 
-        Self { x, y, size }
+            (x, 0, (right - x).max(0) as u32)
+        };
+        let (y, v, height) = if new_y < self.y {
+            let v = self.y - new_y;
+
+            (self.y, v, self.height() - v as u32)
+        } else {
+            let bottom = self.bottom();
+            let y = new_y.min(bottom);
+
+            (y, 0, (bottom - y).max(0) as u32)
+        };
+
+        let size = Size::new(width, height);
+        let uv = Coordinate::new(u, v);
+
+        (uv, Self { x, y, size })
     }
 
     /// Width as `u32`.
@@ -381,7 +402,6 @@ impl Add<Coordinate> for Rect {
     }
 }
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -389,7 +409,10 @@ mod tests {
     #[test]
     fn rect_shift() {
         let rect = Rect::new(10, 10, (10, 10));
-        assert_eq!(rect.shift(15, 15), Rect::new(15, 15, (5, 5)));
+        assert_eq!(
+            rect.shift(15, 15),
+            ((0, 0).into(), Rect::new(15, 15, (5, 5)))
+        );
+        assert_eq!(rect.shift(5, 5), ((5, 5).into(), Rect::new(10, 10, (5, 5))));
     }
 }
-*/
