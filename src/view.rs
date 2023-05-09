@@ -116,6 +116,46 @@ impl ImageView {
         (coord, Self(rect))
     }
 
+    /// Try to make the size of the rectangle smaller.
+    pub fn shrink<S>(&mut self, size: S)
+    where
+        S: Into<Size>,
+    {
+        self.0.size = size.into().min(self.size());
+    }
+
+    /// Clip the view to fit in another one.
+    pub fn clip(&mut self, other: ImageView) {
+        let (right, bottom) = (self.0.right(), self.0.bottom());
+
+        // Clip the left edge
+        if self.0.x < other.x() {
+            self.0.x = other.x();
+            let width = (right - self.0.x);
+            assert!(width >= 0);
+            self.0.size.width = width as u32;
+        }
+        // Clip the top edge
+        if self.0.y < other.y() {
+            self.0.y = other.y();
+            let height = (bottom - self.0.y);
+            assert!(height >= 0);
+            self.0.size.height = height as u32;
+        }
+        // Clip the right edge
+        if right > other.0.right() {
+            let width = (other.0.right() - self.0.x);
+            assert!(width >= 0);
+            self.0.size.width = width as u32;
+        }
+        // Clip the bottom edge
+        if bottom > other.0.bottom() {
+            let height = (other.0.bottom() - self.0.y);
+            assert!(height >= 0);
+            self.0.size.height = height as u32;
+        }
+    }
+
     /// Move the coordinates in a positive direction while keeping the right and bottom edge.
     pub fn add_coordinate_abs<C>(&mut self, coord: C)
     where
@@ -148,6 +188,15 @@ impl ImageView {
     /// Y position.
     pub fn y(&self) -> i32 {
         self.0.y
+    }
+    /// Right position, `x + width`.
+    pub fn right(&self) -> i32 {
+        self.0.right()
+    }
+
+    /// Bottom position, `y + height`.
+    pub fn bottom(&self) -> i32 {
+        self.0.bottom()
     }
 
     /// Get our data as the subrectangle.

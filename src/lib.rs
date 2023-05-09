@@ -149,6 +149,9 @@ impl<'a, 'b, B: Blit> BlitPipeline<'a, 'b, B> {
         let (uv_offset, target_view) = self.target_view.shift(position.x, position.y);
         self.target_view = target_view;
 
+        // Make the target view the same size as the source view
+        self.target_view.shrink(self.source_view.size());
+
         // Shift the source by the shifted UV coordinates
         self.source_view.add_coordinate_abs(uv_offset);
 
@@ -220,10 +223,12 @@ impl<'a, 'b, B: Blit> BlitPipeline<'a, 'b, B> {
 
     /// Render the result.
     pub fn draw(&mut self) {
+        assert!(self.source_view.x() >= 0);
+        assert!(self.source_view.y() >= 0);
         assert!(self.target_view.x() >= 0);
         assert!(self.target_view.y() >= 0);
-        assert!(self.target_view.x() as u32 + self.target_view.width() < self.target_size.width);
-        assert!(self.target_view.y() as u32 + self.target_view.height() < self.target_size.height);
+        assert!(self.target_view.x() as u32 + self.target_view.width() <= self.target_size.width);
+        assert!(self.target_view.y() as u32 + self.target_view.height() <= self.target_size.height);
 
         self.source.blit_impl(
             &mut self.target,
@@ -232,8 +237,8 @@ impl<'a, 'b, B: Blit> BlitPipeline<'a, 'b, B> {
             self.target_view.y() as usize,
             self.source_view.x() as usize,
             self.source_view.y() as usize,
-            self.source_view.width() as usize,
-            self.source_view.height() as usize,
+            self.target_view.width() as usize,
+            self.target_view.height() as usize,
         );
     }
 
@@ -556,9 +561,6 @@ impl Blit for BlitBuffer {
         width: usize,
         height: usize,
     ) {
-        if width < 800 {
-            dbg!(x, y, u, v, width, height);
-        }
         let source_width = self.size().width as usize;
         for i in 0..height {
             let x_target = (y + i) * target_width + x;

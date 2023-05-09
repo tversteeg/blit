@@ -301,7 +301,7 @@ impl Rect {
         let (x, u, width) = if new_x < self.x {
             let u = self.x - new_x;
 
-            (self.x, u, self.width() - u as u32)
+            (self.x, u, self.width().saturating_sub(u as u32))
         } else {
             let right = self.right();
             let x = new_x.min(right);
@@ -311,7 +311,7 @@ impl Rect {
         let (y, v, height) = if new_y < self.y {
             let v = self.y - new_y;
 
-            (self.y, v, self.height() - v as u32)
+            (self.y, v, self.height().saturating_sub(v as u32))
         } else {
             let bottom = self.bottom();
             let y = new_y.min(bottom);
@@ -414,5 +414,10 @@ mod tests {
             ((0, 0).into(), Rect::new(15, 15, (5, 5)))
         );
         assert_eq!(rect.shift(5, 5), ((5, 5).into(), Rect::new(10, 10, (5, 5))));
+
+        // Must be clipped when outside of bounds, we don't care about UVs in this case
+        assert_eq!(rect.shift(20, 20).1, Rect::new(20, 20, (0, 0)));
+        assert_eq!(rect.shift(0, 0).1, Rect::new(10, 10, (0, 0)));
+        assert_eq!(rect.shift(-5, -5).1, Rect::new(10, 10, (0, 0)));
     }
 }
