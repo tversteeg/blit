@@ -116,6 +116,26 @@ impl ImageView {
         (coord, Self(rect))
     }
 
+    /// Shift this rectangle inside another rectangle.
+    pub fn shift_inside<C, R>(&mut self, coord: C, parent: R) -> Coordinate
+    where
+        C: Into<Coordinate>,
+        R: Into<ImageView>,
+    {
+        let coord = coord.into();
+        let parent = parent.into();
+
+        // Move the sub rectangle inside the rectangle
+        self.0.x = coord.x;
+        self.0.y = coord.y;
+
+        // Clip it
+        self.clip(parent);
+
+        // Calculate the UV by how much is clipped
+        self.coord() - coord
+    }
+
     /// Try to make the size of the rectangle smaller.
     pub fn shrink<S>(&mut self, size: S)
     where
@@ -125,33 +145,34 @@ impl ImageView {
     }
 
     /// Clip the view to fit in another one.
-    pub fn clip(&mut self, other: ImageView) {
+    pub fn clip<V>(&mut self, other: V)
+    where
+        V: Into<ImageView>,
+    {
+        let other = other.into();
+
         let (right, bottom) = (self.0.right(), self.0.bottom());
 
         // Clip the left edge
         if self.0.x < other.x() {
             self.0.x = other.x();
-            let width = (right - self.0.x);
-            assert!(width >= 0);
+            let width = (right - self.0.x).max(0);
             self.0.size.width = width as u32;
         }
         // Clip the top edge
         if self.0.y < other.y() {
             self.0.y = other.y();
-            let height = (bottom - self.0.y);
-            assert!(height >= 0);
+            let height = (bottom - self.0.y).max(0);
             self.0.size.height = height as u32;
         }
         // Clip the right edge
         if right > other.0.right() {
-            let width = (other.0.right() - self.0.x);
-            assert!(width >= 0);
+            let width = (other.0.right() - self.0.x).max(0);
             self.0.size.width = width as u32;
         }
         // Clip the bottom edge
         if bottom > other.0.bottom() {
-            let height = (other.0.bottom() - self.0.y);
-            assert!(height >= 0);
+            let height = (other.0.bottom() - self.0.y).max(0);
             self.0.size.height = height as u32;
         }
     }
@@ -180,6 +201,11 @@ impl ImageView {
         self.0.height()
     }
 
+    /// X & Y position as a coordinate.
+    pub fn coord(&self) -> Coordinate {
+        self.0.coord()
+    }
+
     /// X position.
     pub fn x(&self) -> i32 {
         self.0.x
@@ -202,6 +228,12 @@ impl ImageView {
     /// Get our data as the subrectangle.
     pub fn as_sub_rect(&self) -> Rect {
         self.0
+    }
+}
+
+impl From<Rect> for ImageView {
+    fn from(value: Rect) -> Self {
+        Self(value)
     }
 }
 

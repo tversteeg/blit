@@ -36,7 +36,6 @@
 pub mod geom;
 #[cfg(feature = "image")]
 mod image;
-pub mod ops;
 pub mod slice;
 mod view;
 
@@ -125,15 +124,12 @@ pub trait ToBlitBuffer {
 pub struct BlitPipeline<'a, 'b, B: Blit> {
     /// What to blit.
     source: &'a B,
-    /// View on the source buffer.
-    source_view: ImageView,
-
     /// Where to blit it to.
     target: &'b mut [Color],
     /// Full size of the target buffer.
     target_size: Size,
-    /// View on the target buffer.
-    target_view: ImageView,
+    /// Target and source views.
+    views: Vec<PipelineView>,
 }
 
 impl<'a, 'b, B: Blit> BlitPipeline<'a, 'b, B> {
@@ -145,15 +141,15 @@ impl<'a, 'b, B: Blit> BlitPipeline<'a, 'b, B> {
     {
         let position = position.into();
 
-        // Shift the image around in the target rectangle
-        let (uv_offset, target_view) = self.target_view.shift(position.x, position.y);
-        self.target_view = target_view;
+        self.views.iter_mut().for_each(|view| {
+            // Shift the image around in the target rectangle
+            let uv_offset = view
+                .target
+                .shift_inside(position, ImageView::new_unchecked(0, 0, self.target_size));
 
-        // Make the target view the same size as the source view
-        self.target_view.shrink(self.source_view.size());
-
-        // Shift the source by the shifted UV coordinates
-        self.source_view.add_coordinate_abs(uv_offset);
+            // Shift the source by the shifted UV coordinates
+            view.uv = (view.uv + uv_offset).rem_euclid(self.source.size());
+        });
 
         self
     }
@@ -167,6 +163,23 @@ impl<'a, 'b, B: Blit> BlitPipeline<'a, 'b, B> {
     where
         S: Into<Size>,
     {
+        let area = area.into();
+
+        /*
+        // Find how many times we need to tile
+        let complete_tiles = area % self.source_view.size();
+        let remainder_tiles = area / self.source_view.size();
+
+        // TODO: fill properly
+        let mut tiles = Vec::with_capacity(complete_tiles.pixels());
+
+        for coord in complete_tiles.coord_iter() {
+            let new = self
+                .clone(&mut self.target)
+                .position(self.source_view.coord() + coord * self.source_view.size());
+            tiles.push(new);
+        }
+        */
         self
     }
 
@@ -185,6 +198,13 @@ impl<'a, 'b, B: Blit> BlitPipeline<'a, 'b, B> {
     where
         R: Into<Rect>,
     {
+        let sub_rect = sub_rect.into();
+
+        self.views.iter_mut().for_each(|view| {
+            view.uv += sub_rect.coord();
+            view.target.shrink(sub_rect.size());
+        });
+
         self
     }
 
@@ -223,49 +243,49 @@ impl<'a, 'b, B: Blit> BlitPipeline<'a, 'b, B> {
 
     /// Render the result.
     pub fn draw(&mut self) {
-        assert!(self.source_view.x() >= 0);
-        assert!(self.source_view.y() >= 0);
-        assert!(self.target_view.x() >= 0);
-        assert!(self.target_view.y() >= 0);
-        assert!(self.target_view.x() as u32 + self.target_view.width() <= self.target_size.width);
-        assert!(self.target_view.y() as u32 + self.target_view.height() <= self.target_size.height);
+        for view in self.views.iter() {
+            assert!(view.target.x() >= 0);
+            assert!(view.target.y() >= 0);
+            assert!(view.target.x() as u32 + view.target.width() <= self.target_size.width);
+            assert!(view.target.y() as u32 + view.target.height() <= self.target_size.height);
 
-        self.source.blit_impl(
-            &mut self.target,
-            self.target_size.width as usize,
-            self.target_view.x() as usize,
-            self.target_view.y() as usize,
-            self.source_view.x() as usize,
-            self.source_view.y() as usize,
-            self.target_view.width() as usize,
-            self.target_view.height() as usize,
-        );
+            assert!(view.uv.x >= 0);
+            assert!(view.uv.y >= 0);
+
+            self.source.blit_impl(
+                &mut self.target,
+                self.target_size.width as usize,
+                view.target.x() as usize,
+                view.target.y() as usize,
+                view.uv.x as usize,
+                view.uv.y as usize,
+                view.target.width() as usize,
+                view.target.height() as usize,
+            );
+        }
     }
 
     /// Construct a new pipeline with defaults.
     pub(crate) fn new(source: &'a B, target: &'b mut [Color], target_size: Size) -> Self {
         let pos = Coordinate::new(0, 0);
 
-        let target_view = ImageView::new_unchecked(0, 0, target_size);
-        let source_view = ImageView::new_unchecked(0, 0, source.size());
+        let mut target_view = ImageView::new_unchecked(0, 0, target_size);
+        // Make the target view the same size as the source view
+        target_view.shrink(source.size());
+
+        let uv = Coordinate::new(0, 0);
+
+        let mut views = vec![PipelineView {
+            uv,
+            target: target_view,
+        }];
 
         Self {
             source,
-            source_view,
             target,
             target_size,
-            target_view,
+            views,
         }
-    }
-}
-
-/// A pipeline that's been split over multiple separate rendering parts by operations.
-pub struct SplitPipeline<'a, 'b, B: Blit>(Vec<BlitPipeline<'a, 'b, B>>);
-
-impl<'a, 'b, B: Blit> SplitPipeline<'a, 'b, B> {
-    /// Render the result.
-    pub fn draw(&mut self) {
-        self.0.iter_mut().for_each(BlitPipeline::draw);
     }
 }
 
@@ -614,6 +634,13 @@ impl std::fmt::Debug for BlitBuffer {
             .field("height", &self.size.height)
             .finish()
     }
+}
+
+/// New view on a pipeline.
+#[derive(Debug, Clone)]
+struct PipelineView {
+    target: ImageView,
+    uv: Coordinate,
 }
 
 #[cfg(test)]

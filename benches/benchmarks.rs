@@ -1,4 +1,8 @@
-use blit::{geom::Size, Blit, BlitOptions, ToBlitBuffer};
+use blit::{
+    geom::Size,
+    prelude::{Coordinate, Rect},
+    Blit, ToBlitBuffer,
+};
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use criterion_perf_events::Perf;
 use perfcnt::linux::{HardwareEventType, PerfCounterBuilderLinux};
@@ -22,17 +26,15 @@ fn criterion_benchmark(c: &mut Criterion<Perf>) {
         SIZE as i32 - size.width as i32 / 2,
         SIZE as i32,
     ] {
-        let options = BlitOptions::new_position(x, 0);
+        let pos = Coordinate::new(x, 0);
 
-        group.bench_with_input(BenchmarkId::from_parameter(x), &options, |b, options| {
+        group.bench_with_input(BenchmarkId::from_parameter(x), &pos, |b, pos| {
             let mut buffer: Vec<u32> = vec![0; SIZE * SIZE];
 
             b.iter(|| {
-                blit.blit(
-                    &mut buffer,
-                    black_box(Size::new(SIZE, SIZE)),
-                    black_box(options),
-                )
+                blit.blit(&mut buffer, black_box(Size::new(SIZE, SIZE)))
+                    .position(*pos)
+                    .draw()
             });
         });
     }
@@ -47,20 +49,23 @@ fn criterion_benchmark(c: &mut Criterion<Perf>) {
         SIZE as i32 - size.width as i32 / 2,
         SIZE as i32,
     ] {
-        let options =
-            BlitOptions::new_position(x, 0).with_sub_rect((0, 0, size.width / 2, size.height / 2));
+        let pos = Coordinate::new(x, 0);
+        let sub_rect = Rect::new(0, 0, size / 2);
 
-        group.bench_with_input(BenchmarkId::from_parameter(x), &options, |b, options| {
-            let mut buffer: Vec<u32> = vec![0; SIZE * SIZE];
+        group.bench_with_input(
+            BenchmarkId::from_parameter(x),
+            &(pos, sub_rect),
+            |b, (pos, sub_rect)| {
+                let mut buffer: Vec<u32> = vec![0; SIZE * SIZE];
 
-            b.iter(|| {
-                blit.blit(
-                    &mut buffer,
-                    black_box(Size::new(SIZE, SIZE)),
-                    black_box(options),
-                )
-            });
-        });
+                b.iter(|| {
+                    blit.blit(&mut buffer, black_box(Size::new(SIZE, SIZE)))
+                        .position(*pos)
+                        .sub_rect(*sub_rect)
+                        .draw()
+                });
+            },
+        );
     }
     group.finish();
 
@@ -68,7 +73,7 @@ fn criterion_benchmark(c: &mut Criterion<Perf>) {
         let mut buffer: Vec<u32> = vec![0; size.pixels()];
 
         b.iter(|| {
-            blit.blit(&mut buffer, black_box(size), black_box(&BlitOptions::new()));
+            blit.blit(&mut buffer, black_box(size)).draw();
         });
     });
 

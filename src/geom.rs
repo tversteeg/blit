@@ -1,6 +1,6 @@
 //! Helper structs for simple geometric calculations.
 
-use std::ops::{Add, Div, Mul, Range, Rem, Sub};
+use std::ops::{Add, AddAssign, Div, Mul, Range, Rem, Sub};
 
 use num_traits::ToPrimitive;
 #[cfg(feature = "serde")]
@@ -38,6 +38,19 @@ impl Coordinate {
     pub const fn as_tuple(&self) -> (i32, i32) {
         (self.x, self.y)
     }
+
+    /// Real modulus.
+    pub(crate) fn rem_euclid<C>(&self, other: C) -> Self
+    where
+        C: Into<Coordinate>,
+    {
+        let other = other.into();
+
+        Self {
+            x: self.x.rem_euclid(other.x),
+            y: self.y.rem_euclid(other.y),
+        }
+    }
 }
 
 impl<X, Y> From<(X, Y)> for Coordinate
@@ -53,13 +66,87 @@ where
     }
 }
 
-impl Rem<Coordinate> for Coordinate {
+impl<C> Add<C> for Coordinate
+where
+    C: Into<Coordinate>,
+{
     type Output = Self;
 
-    fn rem(self, rhs: Coordinate) -> Self::Output {
+    fn add(self, rhs: C) -> Self::Output {
+        let rhs = rhs.into();
+
+        Self {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+        }
+    }
+}
+
+impl<C> AddAssign<C> for Coordinate
+where
+    C: Into<Coordinate>,
+{
+    fn add_assign(&mut self, rhs: C) {
+        let rhs = rhs.into();
+
+        self.x += rhs.x;
+        self.y += rhs.y;
+    }
+}
+
+impl<C> Sub<C> for Coordinate
+where
+    C: Into<Coordinate>,
+{
+    type Output = Self;
+
+    fn sub(self, rhs: C) -> Self::Output {
+        let rhs = rhs.into();
+
+        Self {
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
+        }
+    }
+}
+
+impl<C> Mul<C> for Coordinate
+where
+    C: Into<Coordinate>,
+{
+    type Output = Self;
+
+    fn mul(self, rhs: C) -> Self::Output {
+        let rhs = rhs.into();
+
+        Self {
+            x: self.x * rhs.x,
+            y: self.y * rhs.y,
+        }
+    }
+}
+
+impl<C> Rem<C> for Coordinate
+where
+    C: Into<Coordinate>,
+{
+    type Output = Self;
+
+    fn rem(self, rhs: C) -> Self::Output {
+        let rhs = rhs.into();
+
         Self {
             x: self.x % rhs.x,
             y: self.y % rhs.y,
+        }
+    }
+}
+
+impl From<Size> for Coordinate {
+    fn from(size: Size) -> Self {
+        Self {
+            x: size.width as i32,
+            y: size.height as i32,
         }
     }
 }
@@ -118,11 +205,30 @@ impl Size {
         }
     }
 
+    /// Create an iterator going over all pixels in row first order.
+    pub(crate) fn coord_iter(&self) -> impl Iterator<Item = Coordinate> {
+        let x_range = 0..self.width;
+        (0..self.height).flat_map(move |y| x_range.clone().map(move |x| Coordinate::new(x, y)))
+    }
+
     /// Set the size to the `min()` of another size.
     pub(crate) fn min(&self, other: Self) -> Self {
         Self {
             width: self.width.min(other.width),
             height: self.height.min(other.height),
+        }
+    }
+
+    /// Real modulus.
+    pub(crate) fn rem_euclid<S>(&self, other: S) -> Self
+    where
+        S: Into<Size>,
+    {
+        let other = other.into();
+
+        Self {
+            width: self.width.rem_euclid(other.width),
+            height: self.height.rem_euclid(other.height),
         }
     }
 }
@@ -335,6 +441,11 @@ impl Rect {
         self.size.height
     }
 
+    /// Width and height as [`Size`].
+    pub fn size(&self) -> Size {
+        self.size
+    }
+
     /// Right position, `x + width`.
     pub fn right(&self) -> i32 {
         self.x + self.width() as i32
@@ -343,6 +454,11 @@ impl Rect {
     /// Bottom position, `y + height`.
     pub fn bottom(&self) -> i32 {
         self.y + self.height() as i32
+    }
+
+    /// X & Y position as a coordinate.
+    pub fn coord(&self) -> Coordinate {
+        Coordinate::new(self.x, self.y)
     }
 
     /// `(x, y, width, height)` slice.

@@ -51,14 +51,16 @@ fn frame_complete(
     let center = (DST_SIZE / 2 - buf.size() / 2).as_tuple();
 
     buf.blit(dst, DST_SIZE).position(center).draw();
-    buf.blit(dst, DST_SIZE).position(mouse).draw();
+    buf.blit(dst, DST_SIZE)
+        .position(mouse - buf.size() / 2)
+        .draw();
 
     draw_text(dst, font, 0, "Blit the full sprite");
     draw_text(
         dst,
         font,
-        DST_SIZE.height - CHAR_SIZE.height,
-        "BlitOptions::new(mouse)",
+        DST_SIZE.height - CHAR_SIZE.height * 2,
+        "buf.blit(dst, dst_size)\n\t.position(mouse).draw()",
     );
 }
 
@@ -89,7 +91,7 @@ fn frame_area(
         dst,
         font,
         DST_SIZE.height - CHAR_SIZE.height * 2,
-        "BlitOptions::new(position)\n\t.with_area((mouse_x, height))",
+        "buf.blit(dst, dst_size).area(mouse).draw()",
     );
 }
 
@@ -105,8 +107,10 @@ fn frame_sub_rect(
     let mut sprite_size = buf.size();
     sprite_size.height = (mouse.y - center.y).clamp(0, buf.height() as i32) as u32;
 
-    buf.blit(dst, DST_SIZE).position(center);
-    todo!();
+    buf.blit(dst, DST_SIZE)
+        .position(center)
+        .sub_rect(Rect::new(0, 0, sprite_size))
+        .draw();
 
     draw_text(
         dst,
@@ -117,8 +121,8 @@ fn frame_sub_rect(
     draw_text(
         dst,
         font,
-        DST_SIZE.height - CHAR_SIZE.height * 2,
-        "BlitOptions::new(position)\n\t.with_sub_rect((0, 0, width, mouse_y))",
+        DST_SIZE.height - CHAR_SIZE.height * 3,
+        "buf.blit(dst, dst_size)\n\t.sub_rect((0, 0, width, mouse_y)).\n\tdraw()",
     );
 }
 
@@ -425,9 +429,9 @@ async fn run() {
     let frames: Vec<fn(&mut [u32], &BlitBuffer, &BlitBuffer, &BlitBuffer, Coordinate)> = vec![
         frame_intro,
         frame_complete,
-        /*
         frame_area,
         frame_sub_rect,
+        /*
         frame_sub_rect2,
         frame_area2,
         frame_tiled,
