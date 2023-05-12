@@ -246,6 +246,15 @@ where
     }
 }
 
+impl From<Coordinate> for Size {
+    fn from(value: Coordinate) -> Self {
+        Self {
+            width: value.x.max(0) as u32,
+            height: value.y.max(0) as u32,
+        }
+    }
+}
+
 impl Add<Size> for Size {
     type Output = Self;
 

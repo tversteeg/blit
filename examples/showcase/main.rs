@@ -126,6 +126,32 @@ fn frame_sub_rect(
     );
 }
 
+/// Draw the sprite with shifed UV coordinates.
+fn frame_uv(
+    dst: &mut [u32],
+    buf: &BlitBuffer,
+    _scalable_buf: &BlitBuffer,
+    font: &BlitBuffer,
+    mouse: Coordinate,
+) {
+    let center = (DST_SIZE / 2 - buf.size() / 2).as_coordinate();
+
+    buf.blit(dst, DST_SIZE).position(center).uv(mouse).draw();
+
+    draw_text(
+        dst,
+        font,
+        0,
+        "Shifting the UV coordinates allows you to\nscroll the image around",
+    );
+    draw_text(
+        dst,
+        font,
+        DST_SIZE.height - CHAR_SIZE.height * 3,
+        "buf.blit(dst, dst_size)\n\t.uv(mouse)\n\t.draw()",
+    );
+}
+
 /*
 /// Draw the middle section of the sprite by taking a sub rectangle from it.
 fn frame_sub_rect2(
@@ -431,6 +457,7 @@ async fn run() {
         frame_complete,
         frame_area,
         frame_sub_rect,
+        frame_uv,
         /*
         frame_sub_rect2,
         frame_area2,

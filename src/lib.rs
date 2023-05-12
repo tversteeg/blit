@@ -189,6 +189,17 @@ impl<'a, 'b, B: Blit> BlitPipeline<'a, 'b, B> {
     where
         C: Into<Coordinate>,
     {
+        let uv = uv.into();
+
+        self.views.iter_mut().for_each(|view| {
+            // Shift the source by the shifted UV coordinates
+            view.uv = (view.uv + uv).rem_euclid(self.source.size());
+
+            // Split the view in two, by adding a new one to wrap around
+            view.target.shift(view.uv.x, view.uv.y);
+            dbg!(view);
+        });
+
         self
     }
 
