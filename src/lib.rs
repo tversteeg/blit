@@ -131,7 +131,7 @@ pub struct BlitOptions {
     ///
     /// - When `None` is used, `(0, 0, target_width, target_height)` is set instead.
     /// - With `Some(..)`, the values in the tuple are `(x, y, width, height)`.
-    pub mask_rect: Option<SubRect>,
+    pub mask: Option<SubRect>,
 
     /// Divide the source buffer into multiple vertical sections and repeat the chosen section to fill the area.
     ///
@@ -213,6 +213,21 @@ impl BlitOptions {
         S: Into<Size>,
     {
         self.set_area(area.into());
+
+        self
+    }
+
+    /// Set the size of the area `(width, height)` to only show on the destination buffer.
+    ///
+    /// # Sets field(s)
+    ///
+    /// - [`BlitOptions::mask`]
+    #[must_use]
+    pub fn with_mask<R>(mut self, mask: R) -> Self
+    where
+        R: Into<SubRect>,
+    {
+        self.set_mask(mask.into());
 
         self
     }
@@ -410,6 +425,18 @@ impl BlitOptions {
         self.horizontal_slice = Some(Slice::ternary(center.y, center.bottom()));
     }
 
+    /// Set the size of the area `(width, height)` to only show on the destination buffer.
+    ///
+    /// # Sets field(s)
+    ///
+    /// - [`BlitOptions::mask`]
+    pub fn set_mask<R>(&mut self, mask: R)
+    where
+        R: Into<SubRect>,
+    {
+        self.mask = Some(mask.into());
+    }
+
     /// Scale a single horizontal piece of the buffer while keeping the other parts the same height.
     ///
     /// See [`crate::slice::Slice`] for more information.
@@ -569,19 +596,40 @@ impl BlitBuffer {
 
         // Find a view on the dst based on the area
         let area = options.area(self.size);
-        let dst_area = match dst_view.sub_i32(options.x, options.y, area) {
+        let mut dst_area = match dst_view.sub_i32(options.x, options.y, area) {
             Some(dst_area) => dst_area,
             None => return,
         };
 
         // Another view based on the subrectangle
-        let sub_rect_view = match src_view.sub(options.sub_rect(self.size)) {
+        let mut sub_rect_view = match src_view.sub(options.sub_rect(self.size)) {
             Some(sub_rect_view) => sub_rect_view,
             None => return,
         };
 
         // We can draw the image exactly
         if sub_rect_view.size() == area {
+            if let Some(mask) = options.mask {
+                let (prev_x, prev_y) = dst_area.coord();
+
+                // Clip the dst view on the mask area first
+                dst_area = dst_area.clip(mask);
+
+                // When it's fully clipped do nothing
+                if dst_area.width() == 0 || dst_area.height() == 0 {
+                    return;
+                }
+
+                // How much coordinates got offset changed
+                let (new_x, new_y) = dst_area.coord();
+
+                // Shift the UV coords of the sub rect view
+                sub_rect_view.0.x = (sub_rect_view.0.x + new_x - prev_x).max(0);
+                sub_rect_view.0.y = (sub_rect_view.0.y + new_y - prev_y).max(0);
+                sub_rect_view.0.size.width = dst_area.width();
+                sub_rect_view.0.size.height = dst_area.height();
+            }
+
             // Pixel range of the source
             sub_rect_view
                 .parent_ranges_iter(self.size)
@@ -598,51 +646,55 @@ impl BlitBuffer {
             for tile_x in 0..tiles.width {
                 // Fully render the filled tiles
                 for tile_y in 0..tiles.height {
-                    let options = BlitOptions::new_position(
+                    let mut new_options = BlitOptions::new_position(
                         options.x + (tile_x * sub_rect_view.width()) as i32,
                         options.y + (tile_y * sub_rect_view.height()) as i32,
                     )
                     .with_sub_rect(sub_rect_view.as_sub_rect());
+                    new_options.mask = options.mask;
 
-                    self.blit_slice(dst, dst_size, &options);
+                    self.blit_slice(dst, dst_size, &new_options);
                 }
 
                 if remainder.height > 0 {
                     // Render the horizontal remainder
-                    let options = BlitOptions::new_position(
+                    let mut new_options = BlitOptions::new_position(
                         options.x + (tile_x * sub_rect_view.width()) as i32,
                         options.y + (tiles.height * sub_rect_view.height()) as i32,
                     )
                     .with_sub_rect(sub_rect_view.as_sub_rect())
                     .with_area((sub_rect_view.width(), remainder.height));
+                    new_options.mask = options.mask;
 
-                    self.blit_slice(dst, dst_size, &options);
+                    self.blit_slice(dst, dst_size, &new_options);
                 }
             }
 
             if remainder.width > 0 {
                 // Render the vertical remainder
                 for tile_y in 0..tiles.height {
-                    let options = BlitOptions::new_position(
+                    let mut new_options = BlitOptions::new_position(
                         options.x + (tiles.width * sub_rect_view.width()) as i32,
                         options.y + (tile_y * sub_rect_view.height()) as i32,
                     )
                     .with_sub_rect(sub_rect_view.as_sub_rect())
                     .with_area((remainder.width, sub_rect_view.height()));
+                    new_options.mask = options.mask;
 
-                    self.blit_slice(dst, dst_size, &options);
+                    self.blit_slice(dst, dst_size, &new_options);
                 }
 
                 if remainder.height > 0 {
                     // Render the single leftover remainder
-                    let options = BlitOptions::new_position(
+                    let mut new_options = BlitOptions::new_position(
                         options.x + (tiles.width * sub_rect_view.width()) as i32,
                         options.y + (tiles.height * sub_rect_view.height()) as i32,
                     )
                     .with_sub_rect(sub_rect_view.as_sub_rect())
                     .with_area(remainder);
+                    new_options.mask = options.mask;
 
-                    self.blit_slice(dst, dst_size, &options);
+                    self.blit_slice(dst, dst_size, &new_options);
                 }
             }
         }

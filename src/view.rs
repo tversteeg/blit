@@ -5,7 +5,7 @@ use num_traits::ToPrimitive;
 use crate::{Size, SubRect};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ImageView(SubRect);
+pub(crate) struct ImageView(pub(crate) SubRect);
 
 impl ImageView {
     /// Create a new view based on the size of the original buffer.
@@ -115,6 +115,42 @@ impl ImageView {
         Self::new((x, y, new_width, new_height), self.as_sub_rect())
     }
 
+    /// Clip the view to fit in another one.
+    pub fn clip<R>(&self, other: R) -> ImageView
+    where
+        R: Into<SubRect>,
+    {
+        let other = other.into();
+        let mut new = self.clone();
+
+        let (right, bottom) = (self.0.right(), self.0.bottom());
+
+        // Clip the left edge
+        if self.0.x < other.x {
+            new.0.x = other.x;
+            let width = (right - new.0.x).max(0);
+            new.0.size.width = width as u32;
+        }
+        // Clip the top edge
+        if self.0.y < other.y {
+            new.0.y = other.y;
+            let height = (bottom - new.0.y).max(0);
+            new.0.size.height = height as u32;
+        }
+        // Clip the right edge
+        if right > other.right() {
+            let width = (other.right() - new.0.x).max(0);
+            new.0.size.width = width as u32;
+        }
+        // Clip the bottom edge
+        if bottom > other.bottom() {
+            let height = (other.bottom() - new.0.y).max(0);
+            new.0.size.height = height as u32;
+        }
+
+        new
+    }
+
     /// Get the amount of X pixels.
     pub fn width(&self) -> u32 {
         self.0.width()
@@ -125,8 +161,19 @@ impl ImageView {
         self.0.height()
     }
 
+    /// X Y coordinates.
+    pub fn coord(&self) -> (i32, i32) {
+        (self.0.x, self.0.y)
+    }
+
     /// Get our data as the subrectangle.
     pub fn as_sub_rect(&self) -> SubRect {
+        self.0
+    }
+}
+
+impl Into<SubRect> for ImageView {
+    fn into(self) -> SubRect {
         self.0
     }
 }
@@ -169,6 +216,18 @@ mod tests {
         assert_eq!(
             ImageView::new((0, 95, 10, 10), (0, 0, 100, 100)),
             Some(ImageView::new_unchecked(0, 95, Size::new(10, 5)))
+        );
+    }
+
+    #[test]
+    fn clip_fn() {
+        assert_eq!(
+            ImageView::new_unchecked(10, 10, Size::new(40, 40)).clip(ImageView::new_unchecked(
+                20,
+                20,
+                Size::new(20, 20)
+            )),
+            ImageView::new_unchecked(20, 20, Size::new(20, 20))
         );
     }
 

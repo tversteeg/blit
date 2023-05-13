@@ -297,6 +297,41 @@ fn frame8(
     );
 }
 
+/// Draw the full sprite with a mask.
+fn frame9(
+    dst: &mut [u32],
+    buf: &BlitBuffer,
+    _scalable_buf: &BlitBuffer,
+    font: &BlitBuffer,
+    mouse: (i32, i32),
+) {
+    let (center_x, center_y) = (DST_SIZE / 2 - buf.size() / 2).as_tuple();
+
+    buf.blit(
+        dst,
+        DST_SIZE,
+        &BlitOptions::new_position(center_x, center_y).with_mask((
+            mouse.0 - 30,
+            mouse.1 - 30,
+            60,
+            60,
+        )),
+    );
+
+    draw_text(
+        dst,
+        font,
+        0,
+        "Clipping based on the destination view\ncan also be achieved with a mask",
+    );
+    draw_text(
+        dst,
+        font,
+        DST_SIZE.height - CHAR_SIZE.height * 5,
+        "BlitOptions::new_position(position)\n\t.with_mask((mouse_x, mouse_y, 30, 30))",
+    );
+}
+
 /// Draw an ASCII string.
 fn draw_text(dst: &mut [u32], font: &BlitBuffer, y: impl ToPrimitive, text: &str) {
     // First character in the image
@@ -397,7 +432,7 @@ async fn run() {
 
     // All frame drawing functions, cycled by clicking
     let frames: Vec<fn(&mut [u32], &BlitBuffer, &BlitBuffer, &BlitBuffer, (i32, i32))> = vec![
-        frame0, frame1, frame2, frame3, frame4, frame5, frame6, frame7, frame8,
+        frame0, frame1, frame2, frame3, frame4, frame5, frame6, frame7, frame8, frame9,
     ];
 
     // Keep track of how long each frame takes to render
