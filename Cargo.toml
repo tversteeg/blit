@@ -26,7 +26,7 @@ serde = ["dep:serde"]
 [dependencies]
 serde = { version = "1.0.166", optional = true, features = ["derive"] }
 num-traits = "0.2.15"
-thiserror = "1.0.40"
+thiserror = "1.0.41"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 image = { version = "0.24.6", optional = true }
