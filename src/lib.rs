@@ -730,15 +730,46 @@ impl BlitBuffer {
 
 impl Blit for BlitBuffer {
     fn blit(&self, dst: &mut [u32], dst_size: Size, options: &BlitOptions) {
+        // TODO: remove this clone
+        let mut options = options.clone();
+
+        // Clip if any of the dimensions are negative
+        if options.x.is_negative() || options.y.is_negative() {
+            // Get the position with the negative dimensions clipped
+            let (new_x, new_y) = (options.x.max(0), options.y.max(0));
+            // Value is not 0 when any of the dimensions is clipped
+            let (diff_x, diff_y) = ((new_x - options.x) as u32, (new_y - options.y) as u32);
+
+            // Use the existing sub rectangle or create one
+            let mut sub_rect = options
+                .sub_rect
+                .unwrap_or_else(|| SubRect::from_size(self.size()));
+
+            if diff_x > sub_rect.size.width || diff_y > sub_rect.size.height {
+                // Nothing to render, image is fully clipped
+                return;
+            }
+
+            // Offset the sub rectangle with the clipped area
+            sub_rect.x += diff_x as i32;
+            sub_rect.y += diff_y as i32;
+            sub_rect.size.width -= diff_x;
+            sub_rect.size.height -= diff_y;
+
+            options.set_sub_rect(sub_rect);
+            options.x = new_x;
+            options.y = new_y;
+        }
+
         // Get the total area we need to draw the slices in
         let area = options.area(self.size);
 
         // Which slices do we need to draw if any
-        let slice_projections = self.slice_projections(options, area);
+        let slice_projections = self.slice_projections(&options, area);
 
         if slice_projections.is_empty() {
             // Render without projections
-            self.blit_slice(dst, dst_size, options);
+            self.blit_slice(dst, dst_size, &options);
         } else {
             // Loop over each slice
             slice_projections.into_iter().for_each(|(source, target)| {

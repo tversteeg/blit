@@ -505,11 +505,10 @@ async fn run() {
                 ..
             } if window_id == window.id() => {
                 // Update the mouse position
-                let mouse_pos = pixels
+                mouse = pixels
                     .window_pos_to_pixel((position.x as f32, position.y as f32))
-                    .unwrap_or_default();
-                mouse.0 = mouse_pos.0 as i32;
-                mouse.1 = mouse_pos.1 as i32;
+                    .map(|(x, y)| (x as i32, y as i32))
+                    .unwrap_or_else(|(x, y)| (x as i32, y as i32));
 
                 // Draw another frame
                 window.request_redraw();
