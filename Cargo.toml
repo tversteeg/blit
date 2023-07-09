@@ -24,7 +24,7 @@ image = ["dep:image"]
 serde = ["dep:serde"]
 
 [dependencies]
-serde = { version = "1.0.169", optional = true, features = ["derive"] }
+serde = { version = "1.0.170", optional = true, features = ["derive"] }
 num-traits = "0.2.15"
 thiserror = "1.0.43"
 
