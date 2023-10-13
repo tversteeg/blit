@@ -99,6 +99,7 @@ pub trait ToBlitBuffer {
 ///
 /// Slices can be used to control which part gets scaled using tiling scaling.
 #[derive(Debug, Default, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BlitOptions {
     /// Horizontal position on the destination buffer.
     pub x: i32,

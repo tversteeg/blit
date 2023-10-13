@@ -17,11 +17,14 @@
 //! ```
 
 use num_traits::ToPrimitive;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 use crate::{Size, SubRect};
 
 /// Divide the source buffer into multiple sections and repeat the chosen section to fill the area.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Slice {
     /// Split the buffer into two and repeat one of the sections.
     Binary {
@@ -148,6 +151,7 @@ impl Slice {
 
 /// Choose which split of the binary section to scale in a repeating fashion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum BinarySection {
     /// Repeat the first section.
     ///
