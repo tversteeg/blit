@@ -1,5 +1,7 @@
 //! Draw sprites quickly using a masking color or an alpha treshold.
 //!
+//! # [Interactive Demo](https://tversteeg.nl/blit/showcase)
+//!
 //! This crate works with RGBA `u32` buffers.
 //! The alpha channel can only be read with a singular treshold, converting it to a binary transparent or opaque color.
 //! The reason this limitation is in place is that it allows efficient rendering optimizations.
