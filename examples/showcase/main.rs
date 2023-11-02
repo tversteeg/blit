@@ -1,12 +1,9 @@
 use blit::{geom::Size, geom::SubRect, slice::Slice, Blit, BlitBuffer, BlitOptions, ToBlitBuffer};
 
 use num_traits::ToPrimitive;
-use pixels::{PixelsBuilder, SurfaceTexture};
-use winit::{
-    dpi::LogicalSize,
-    event::{ElementState, Event, MouseButton, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
-    window::WindowBuilder,
+use pixel_game_lib::{
+    vek::{Extent2, Vec2},
+    window::{Key, WindowConfig},
 };
 
 // Window settings
@@ -30,7 +27,7 @@ fn frame0(
     _buf: &BlitBuffer,
     _scalable_buf: &BlitBuffer,
     font: &BlitBuffer,
-    _mouse: (i32, i32),
+    _mouse: Vec2<i32>,
 ) {
     draw_text(dst, font, 0, "This is an interactive showcase of the\n'blit' crate, you can interact with the\nrendering by moving the cursor\n\nGo to the next showcase item by clicking\nthe left mouse button\n\nGo to the previous showcase item by\nclicking the right mouse button");
 }
@@ -41,7 +38,7 @@ fn frame1(
     buf: &BlitBuffer,
     _scalable_buf: &BlitBuffer,
     font: &BlitBuffer,
-    mouse: (i32, i32),
+    mouse: Vec2<i32>,
 ) {
     let (center_x, center_y) = (DST_SIZE / 2 - buf.size() / 2).as_tuple();
 
@@ -50,7 +47,11 @@ fn frame1(
         DST_SIZE,
         &BlitOptions::new_position(center_x, center_y),
     );
-    buf.blit(dst, DST_SIZE, &BlitOptions::new_position_tuple(mouse));
+    buf.blit(
+        dst,
+        DST_SIZE,
+        &BlitOptions::new_position_tuple(mouse.into_tuple()),
+    );
 
     draw_text(dst, font, 0, "Blit the full sprite");
     draw_text(
@@ -67,11 +68,11 @@ fn frame2(
     buf: &BlitBuffer,
     _scalable_buf: &BlitBuffer,
     font: &BlitBuffer,
-    mouse: (i32, i32),
+    mouse: Vec2<i32>,
 ) {
     let (center_x, center_y) = (DST_SIZE / 2 - buf.size() / 2).as_tuple();
     let mut sprite_size = buf.size();
-    sprite_size.width = (mouse.0 - center_x as i32).clamp(0, buf.width() as i32) as u32;
+    sprite_size.width = (mouse.x - center_x as i32).clamp(0, buf.width() as i32) as u32;
 
     buf.blit(
         dst,
@@ -100,11 +101,11 @@ fn frame3(
     buf: &BlitBuffer,
     _scalable_buf: &BlitBuffer,
     font: &BlitBuffer,
-    mouse: (i32, i32),
+    mouse: Vec2<i32>,
 ) {
     let (center_x, center_y) = (DST_SIZE / 2 - buf.size() / 2).as_tuple();
     let mut sprite_size = buf.size();
-    sprite_size.height = (mouse.1 - center_y as i32).clamp(0, buf.height() as i32) as u32;
+    sprite_size.height = (mouse.y - center_y as i32).clamp(0, buf.height() as i32) as u32;
 
     buf.blit(
         dst,
@@ -133,7 +134,7 @@ fn frame4(
     buf: &BlitBuffer,
     _scalable_buf: &BlitBuffer,
     font: &BlitBuffer,
-    mouse: (i32, i32),
+    mouse: Vec2<i32>,
 ) {
     let src_size = buf.size() / 2;
     let (center_x, center_y) = (DST_SIZE / 2 - buf.size() / 2).as_tuple();
@@ -142,8 +143,8 @@ fn frame4(
         dst,
         DST_SIZE,
         &BlitOptions::new_position(center_x, center_y).with_sub_rect(SubRect::new(
-            (mouse.0 - center_x as i32).clamp(0, src_size.width as i32),
-            (mouse.1 - center_y as i32).clamp(0, src_size.height as i32),
+            (mouse.x - center_x as i32).clamp(0, src_size.width as i32),
+            (mouse.y - center_y as i32).clamp(0, src_size.height as i32),
             src_size,
         )),
     );
@@ -168,7 +169,7 @@ fn frame5(
     buf: &BlitBuffer,
     _scalable_buf: &BlitBuffer,
     font: &BlitBuffer,
-    mouse: (i32, i32),
+    mouse: Vec2<i32>,
 ) {
     let (offset_x, offset_y) = (40, 40);
 
@@ -176,8 +177,8 @@ fn frame5(
         dst,
         DST_SIZE,
         &BlitOptions::new_position(offset_x, offset_y).with_area(Size::new(
-            (mouse.0 - offset_x).max(1),
-            (mouse.1 - offset_y).max(1),
+            (mouse.x - offset_x).max(1),
+            (mouse.y - offset_y).max(1),
         )),
     );
 
@@ -201,7 +202,7 @@ fn frame6(
     buf: &BlitBuffer,
     _scalable_buf: &BlitBuffer,
     font: &BlitBuffer,
-    mouse: (i32, i32),
+    mouse: Vec2<i32>,
 ) {
     let (offset_x, offset_y) = (40, 40);
 
@@ -210,8 +211,8 @@ fn frame6(
         DST_SIZE,
         &BlitOptions::new_position(offset_x, offset_y)
             .with_area(Size::new(
-                (mouse.0 - offset_x).max(1) as u32,
-                (mouse.1 - offset_y).max(1) as u32,
+                (mouse.x - offset_x).max(1) as u32,
+                (mouse.y - offset_y).max(1) as u32,
             ))
             .with_sub_rect(SubRect::new(0, 70, Size::new(34, 32))),
     );
@@ -236,7 +237,7 @@ fn frame7(
     _buf: &BlitBuffer,
     scalable_buf: &BlitBuffer,
     font: &BlitBuffer,
-    mouse: (i32, i32),
+    mouse: Vec2<i32>,
 ) {
     let (offset_x, offset_y) = (60, 60);
 
@@ -246,8 +247,8 @@ fn frame7(
         &BlitOptions::new_position(offset_x, offset_y)
             .with_slice9((11, 9, 6, 4))
             .with_area(Size::new(
-                (mouse.0 - offset_x).max(1),
-                (mouse.1 - offset_y).max(1),
+                (mouse.x - offset_x).max(1),
+                (mouse.y - offset_y).max(1),
             )),
     );
 
@@ -271,7 +272,7 @@ fn frame8(
     buf: &BlitBuffer,
     _scalable_buf: &BlitBuffer,
     font: &BlitBuffer,
-    mouse: (i32, i32),
+    mouse: Vec2<i32>,
 ) {
     let (offset_x, offset_y) = (60, 60);
 
@@ -280,7 +281,7 @@ fn frame8(
         DST_SIZE,
         &BlitOptions::new_position(offset_x, offset_y)
             .with_vertical_slice(Slice::binary_first(buf.width() / 2))
-            .with_area(Size::new((mouse.0 - offset_x).max(1), buf.height())),
+            .with_area(Size::new((mouse.x - offset_x).max(1), buf.height())),
     );
 
     draw_text(
@@ -303,7 +304,7 @@ fn frame9(
     buf: &BlitBuffer,
     _scalable_buf: &BlitBuffer,
     font: &BlitBuffer,
-    mouse: (i32, i32),
+    mouse: Vec2<i32>,
 ) {
     let (center_x, center_y) = (DST_SIZE / 2 - buf.size() / 2).as_tuple();
 
@@ -311,8 +312,8 @@ fn frame9(
         dst,
         DST_SIZE,
         &BlitOptions::new_position(center_x, center_y).with_mask((
-            mouse.0 - 30,
-            mouse.1 - 30,
+            mouse.x - 30,
+            mouse.y - 30,
             60,
             60,
         )),
@@ -370,7 +371,7 @@ fn draw_text(dst: &mut [u32], font: &BlitBuffer, y: impl ToPrimitive, text: &str
 }
 
 /// Load the images and draw the window.
-async fn run() {
+fn main() {
     // Load an image with a mask color from disk
     let buf = image::load_from_memory(include_bytes!("./smiley_rgb.png"))
         .unwrap()
@@ -390,194 +391,81 @@ async fn run() {
         .to_blit_buffer_with_alpha(127);
 
     // Setup a winit window
-    let event_loop = EventLoop::new();
-    let size = LogicalSize::new(
-        DST_SIZE.width as f64 * 2.0 + 10.0,
-        DST_SIZE.height as f64 * 2.0 + 10.0,
-    );
-    let mut window_builder = WindowBuilder::new()
-        .with_title("Blit Showcase")
-        .with_inner_size(size);
-
-    // Setup the WASM canvas if running on the browser
-    #[cfg(target_arch = "wasm32")]
-    {
-        use winit::platform::web::WindowBuilderExtWebSys;
-
-        window_builder = window_builder.with_canvas(Some(wasm::setup_canvas()));
-    }
-
-    let window = window_builder.build(&event_loop).unwrap();
-
-    let mut pixels = {
-        let surface_texture =
-            SurfaceTexture::new(DST_SIZE.width * 2 + 10, DST_SIZE.height * 2 + 10, &window);
-        PixelsBuilder::new(DST_SIZE.width, DST_SIZE.height, surface_texture)
-            .clear_color(pixels::wgpu::Color {
-                r: 0.3,
-                g: 0.1,
-                b: 0.3,
-                a: 1.0,
-            })
-            .build_async()
-            .await
-    }
-    .unwrap();
-
-    // Cursor position
-    let mut mouse = (0, 0);
-
-    // Which frame to draw
-    let mut current_frame = 0;
+    let window_config = WindowConfig {
+        buffer_size: Extent2::new(DST_SIZE.width, DST_SIZE.height).as_(),
+        scaling: 2,
+        title: "Blit Showcase".to_string(),
+        ..Default::default()
+    };
 
     // All frame drawing functions, cycled by clicking
-    let frames: Vec<fn(&mut [u32], &BlitBuffer, &BlitBuffer, &BlitBuffer, (i32, i32))> = vec![
+    type Frames = Vec<fn(&mut [u32], &BlitBuffer, &BlitBuffer, &BlitBuffer, Vec2<i32>)>;
+    let frames: Frames = vec![
         frame0, frame1, frame2, frame3, frame4, frame5, frame6, frame7, frame8, frame9,
     ];
 
+    // The game state container everything specified above
+    struct State {
+        buf: BlitBuffer,
+        font: BlitBuffer,
+        scalable_buf: BlitBuffer,
+        // Current mouse position
+        mouse: Vec2<usize>,
+        // Which frame to draw
+        current_frame: usize,
+        frames: Frames,
+    }
+
     // Keep track of how long each frame takes to render
-    event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Wait;
-        match event {
-            // Redraw the pixel buffer
-            Event::RedrawRequested(window_id) if window_id == window.id() => {
-                // Clear the buffer
-                pixels.frame_mut().fill(0);
+    pixel_game_lib::window(
+        State {
+            buf,
+            font,
+            scalable_buf,
+            frames,
+            mouse: Vec2::zero(),
+            current_frame: 0,
+        },
+        window_config.clone(),
+        move |state, input, mouse, _dt| {
+            // Move to the next "slide" when clicking
+            if input.mouse_released(0) {
+                state.current_frame += 1;
 
-                // Convert the [u8] * 4 array of pixels to [u32] and draw the frame
-                frames[current_frame](
-                    bytemuck::cast_slice_mut(pixels.frame_mut()),
-                    &buf,
-                    &scalable_buf,
-                    &font,
-                    mouse,
-                );
-
-                // Blit draws the pixels in RGBA format, but the pixels crate expects BGRA, so convert it
-                pixels.frame_mut().chunks_exact_mut(4).for_each(|color| {
-                    let (r, g, b, a) = (color[0], color[1], color[2], color[3]);
-
-                    color[0] = b;
-                    color[1] = g;
-                    color[2] = r;
-                    color[3] = a;
-                });
-
-                if let Err(err) = pixels.render() {
-                    log::error!("Pixels error:\n{err}");
+                // Wrap around
+                if state.current_frame >= state.frames.len() {
+                    state.current_frame = 0;
                 }
-            }
-
-            // Go to the next frame when the mouse is down
-            Event::WindowEvent {
-                event:
-                    WindowEvent::MouseInput {
-                        button,
-                        state: ElementState::Released,
-                        ..
-                    },
-                window_id,
-                ..
-            } if window_id == window.id() => {
-                if button == MouseButton::Left {
-                    current_frame += 1;
-
-                    // Wrap around
-                    if current_frame >= frames.len() {
-                        current_frame = 0;
-                    }
-                } else if button == MouseButton::Right {
-                    // Wrap around
-                    if current_frame == 0 {
-                        current_frame = frames.len();
-                    }
-
-                    current_frame -= 1;
+            } else if input.mouse_released(1) {
+                // Wrap around
+                if state.current_frame == 0 {
+                    state.current_frame = state.frames.len();
                 }
 
-                // Tell the window to redraw another frame
-                window.request_redraw();
+                state.current_frame -= 1;
             }
-            // Handle the mouse cursor movement
-            Event::WindowEvent {
-                event: WindowEvent::CursorMoved { position, .. },
-                window_id,
-                ..
-            } if window_id == window.id() => {
-                // Update the mouse position
-                mouse = pixels
-                    .window_pos_to_pixel((position.x as f32, position.y as f32))
-                    .map(|(x, y)| (x as i32, y as i32))
-                    .unwrap_or_else(|(x, y)| (x as i32, y as i32));
 
-                // Draw another frame
-                window.request_redraw();
+            // Update the mouse coordinates
+            if let Some(mouse) = mouse {
+                state.mouse = mouse;
             }
-            // Resize the window
-            Event::WindowEvent {
-                event: WindowEvent::Resized(size),
-                window_id,
-            } if window_id == window.id() => {
-                pixels.resize_surface(size.width, size.height).unwrap();
 
-                // Draw another frame
-                window.request_redraw();
-            }
-            // Close the window
-            Event::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                window_id,
-            } if window_id == window.id() => {
-                *control_flow = ControlFlow::Exit;
-            }
-            _ => {}
-        }
-    });
-}
+            // Exit when escape is pressed
+            input.key_pressed(Key::Escape)
+        },
+        |state, canvas, _dt| {
+            // Clear the buffer
+            canvas.fill(0xFF955995);
 
-fn main() {
-    #[cfg(target_arch = "wasm32")]
-    {
-        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-        console_log::init_with_level(log::Level::Info).expect("error initializing logger");
-
-        wasm_bindgen_futures::spawn_local(run());
-    }
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        pollster::block_on(run());
-    }
-}
-
-#[cfg(target_arch = "wasm32")]
-mod wasm {
-    use wasm_bindgen::JsCast;
-    use web_sys::HtmlCanvasElement;
-
-    /// Attach the winit window to a canvas.
-    pub fn setup_canvas() -> HtmlCanvasElement {
-        log::debug!("Binding window to HTML canvas");
-
-        let window = web_sys::window().unwrap();
-
-        let document = window.document().unwrap();
-        let body = document.body().unwrap();
-        body.style().set_css_text("text-align: center");
-
-        let canvas = document
-            .create_element("canvas")
-            .unwrap()
-            .dyn_into::<HtmlCanvasElement>()
-            .unwrap();
-
-        canvas.set_id("canvas");
-        body.append_child(&canvas).unwrap();
-        canvas.style().set_css_text("display:block; margin: auto");
-
-        let header = document.create_element("h2").unwrap();
-        header.set_text_content(Some("Blit Showcase"));
-        body.append_child(&header).unwrap();
-
-        canvas
-    }
+            // Convert the [u8] * 4 array of pixels to [u32] and draw the frame
+            state.frames[state.current_frame](
+                canvas.raw_buffer(),
+                &state.buf,
+                &state.scalable_buf,
+                &state.font,
+                state.mouse.as_(),
+            );
+        },
+    )
+    .expect("Error opening window");
 }
