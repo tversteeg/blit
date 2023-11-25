@@ -24,7 +24,7 @@ image = ["dep:image"]
 serde = ["dep:serde"]
 
 [dependencies]
-serde = { version = "1.0.190", optional = true, features = ["derive"] }
+serde = { version = "1.0.193", optional = true, features = ["derive"] }
 num-traits = "0.2.17"
 thiserror = "1.0.50"
 
@@ -36,7 +36,7 @@ image = { version = "0.24.7", optional = true }
 image = { version = "0.24.7", optional = true, default-features = false, features = ["png"] }
 
 [dev-dependencies]
-pixel-game-lib = { version = "0.3.1", default-features = false }
+pixel-game-lib = { version = "0.4", default-features = false }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }

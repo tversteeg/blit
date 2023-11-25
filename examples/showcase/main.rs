@@ -3,7 +3,7 @@ use blit::{geom::Size, geom::SubRect, slice::Slice, Blit, BlitBuffer, BlitOption
 use num_traits::ToPrimitive;
 use pixel_game_lib::{
     vek::{Extent2, Vec2},
-    window::{Key, WindowConfig},
+    window::{KeyCode, WindowConfig},
 };
 
 // Window settings
@@ -451,7 +451,7 @@ fn main() {
             }
 
             // Exit when escape is pressed
-            input.key_pressed(Key::Escape)
+            input.key_pressed(KeyCode::Escape)
         },
         |state, canvas, _dt| {
             // Clear the buffer
