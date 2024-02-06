@@ -29,11 +29,11 @@ num-traits = "0.2.17"
 thiserror = "1.0.50"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-image = { version = "0.24.7", optional = true }
+image = { version = "0.24.8", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # Only use codecs that actually compile on WASM
-image = { version = "0.24.7", optional = true, default-features = false, features = ["png"] }
+image = { version = "0.24.8", optional = true, default-features = false, features = ["png"] }
 
 [dev-dependencies]
 pixel-game-lib = { version = "0.4", default-features = false }
