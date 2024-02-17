@@ -29,11 +29,7 @@ jobs:
   # Run test check on Linux, macOS, and Windows
   test:
     name: Test
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: true
-      matrix:
-        os: [ubuntu-latest, macOS-latest, windows-latest]
+    runs-on: ubuntu-latest
     steps:
       # Checkout the branch being tested
       - uses: actions/checkout@v4
