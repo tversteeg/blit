@@ -36,7 +36,7 @@ image = { version = "0.24.9", optional = true }
 image = { version = "0.24.9", optional = true, default-features = false, features = ["png"] }
 
 [dev-dependencies]
-pixel-game-lib = { version = "0.4", default-features = false }
+pixel-game-lib = { version = "0.5", default-features = false }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
