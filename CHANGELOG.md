@@ -6,6 +6,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.5](https://github.com/tversteeg/blit/compare/blit-v0.8.4...blit-v0.8.5) - 2024-03-07
+
+### Fixed
+- *(deps)* update rust crate image to 0.24.9
+- *(deps)* update rust crate serde to 1.0.197
+- *(deps)* update rust crate num-traits to 0.2.18 ([#67](https://github.com/tversteeg/blit/pull/67))
+- *(deps)* update rust crate thiserror to 1.0.57 ([#68](https://github.com/tversteeg/blit/pull/68))
+- *(ci)* remove OS-specific tests, since no part of the libarry is OS-specific
+- *(deps)* update rust crate thiserror to 1.0.56 ([#63](https://github.com/tversteeg/blit/pull/63))
+- *(deps)* update rust crate serde to 1.0.196 ([#64](https://github.com/tversteeg/blit/pull/64))
+- *(deps)* update rust crate image to 0.24.8 ([#66](https://github.com/tversteeg/blit/pull/66))
+- *(deps)* update pixel-game-lib to 0.4
+
+### Other
+- *(deps)* update rust crate pixel-game-lib to 0.8
+- *(deps)* update rust crate pixel-game-lib to 0.7
+- *(deps)* update rust crate pixel-game-lib to 0.6
+- *(deps)* update rust crate pixel-game-lib to 0.5
+- *(deps)* update swatinem/rust-cache action to v2.7.3 ([#65](https://github.com/tversteeg/blit/pull/65))
+- *(deps)* update swatinem/rust-cache action to v2.7.1 ([#56](https://github.com/tversteeg/blit/pull/56))
+- *(example)* simplify by moving to pixel-game-lib
+- *(deps)* update dependencies
+
 ## [0.8.4](https://github.com/tversteeg/blit/compare/blit-v0.8.3...blit-v0.8.4) - 2023-10-13
 
 ### Added
