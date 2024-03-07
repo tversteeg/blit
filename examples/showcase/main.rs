@@ -3,7 +3,7 @@ use blit::{geom::Size, geom::SubRect, slice::Slice, Blit, BlitBuffer, BlitOption
 use num_traits::ToPrimitive;
 use pixel_game_lib::{
     vek::{Extent2, Vec2},
-    window::{KeyCode, WindowConfig},
+    window::{KeyCode, MouseButton, WindowConfig},
 };
 
 // Window settings
@@ -41,17 +41,15 @@ fn frame1(
     mouse: Vec2<i32>,
 ) {
     let (center_x, center_y) = (DST_SIZE / 2 - buf.size() / 2).as_tuple();
+    let (mouse_x, mouse_y) =
+        (mouse - Vec2::new(buf.width() / 2, buf.height() / 2).as_()).into_tuple();
 
     buf.blit(
         dst,
         DST_SIZE,
         &BlitOptions::new_position(center_x, center_y),
     );
-    buf.blit(
-        dst,
-        DST_SIZE,
-        &BlitOptions::new_position_tuple(mouse.into_tuple()),
-    );
+    buf.blit(dst, DST_SIZE, &BlitOptions::new_position(mouse_x, mouse_y));
 
     draw_text(dst, font, 0, "Blit the full sprite");
     draw_text(
@@ -429,14 +427,14 @@ fn main() {
         window_config.clone(),
         move |state, input, mouse, _dt| {
             // Move to the next "slide" when clicking
-            if input.mouse_released(0) {
+            if input.mouse_released(MouseButton::Left) {
                 state.current_frame += 1;
 
                 // Wrap around
                 if state.current_frame >= state.frames.len() {
                     state.current_frame = 0;
                 }
-            } else if input.mouse_released(1) {
+            } else if input.mouse_released(MouseButton::Right) {
                 // Wrap around
                 if state.current_frame == 0 {
                     state.current_frame = state.frames.len();
