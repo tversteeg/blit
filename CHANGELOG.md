@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.6](https://github.com/tversteeg/blit/compare/blit-v0.8.5...blit-v0.8.6) - 2024-03-12
+
+### Fixed
+- *(deps)* update rust crate thiserror to 1.0.58
+- *(deps)* update rust crate image to 0.25.0
+
 ## [0.8.5](https://github.com/tversteeg/blit/compare/blit-v0.8.4...blit-v0.8.5) - 2024-03-07
 
 ### Fixed
