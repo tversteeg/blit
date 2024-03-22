@@ -1,11 +1,11 @@
 use blit::{geom::Size, Blit, BlitOptions, ToBlitBuffer};
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use criterion_perf_events::Perf;
-use perfcnt::linux::{HardwareEventType, PerfCounterBuilderLinux};
+use codspeed_criterion_compat::{
+    black_box, criterion_group, criterion_main, BenchmarkId, Criterion,
+};
 
 const SIZE: usize = 300;
 
-fn criterion_benchmark(c: &mut Criterion<Perf>) {
+fn criterion_benchmark(c: &mut Criterion) {
     let rgb = image::load_from_memory(include_bytes!("../examples/showcase/smiley_rgb.png"))
         .unwrap()
         .into_rgb8();
@@ -79,9 +79,5 @@ fn criterion_benchmark(c: &mut Criterion<Perf>) {
     });
 }
 
-criterion_group!(
-    name = benches;
-    config = Criterion::default().with_measurement(Perf::new(PerfCounterBuilderLinux::from_hardware_event(HardwareEventType::Instructions)));
-    targets = criterion_benchmark
-);
+criterion_group!(benches, criterion_benchmark);
 criterion_main!(benches);

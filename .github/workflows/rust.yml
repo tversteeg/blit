@@ -69,7 +69,7 @@ jobs:
         with:
           save-if: ${{ github.event_name == 'push' }}
 
-      # Build the WASM 
+      # Build the WASM
       - name: Build
         run: cargo run --package run-wasm -- --example showcase --release --build-only
 
@@ -81,3 +81,29 @@ jobs:
           BRANCH: gh-pages
           FOLDER: target/wasm-examples
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  bench:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: moonrepo/setup-rust@v0
+        with:
+          channel: stable
+          cache-target: release
+          bins: cargo-codspeed
+
+      # Cache the built dependencies
+      - uses: Swatinem/rust-cache@v2.7.3
+        with:
+          save-if: ${{ github.event_name == 'push' }}
+
+      - name: Build
+        run: cargo codspeed build
+
+      - name: Run benchmarks
+        uses: CodSpeedHQ/action@v2
+        with:
+          run: cargo codspeed run
+          token: ${{ secrets.CODSPEED_TOKEN }}
